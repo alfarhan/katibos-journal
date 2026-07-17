@@ -1,0 +1,9 @@
+{
+  "id": "microjournal-sync",
+  "name": "MicroJournal Sync",
+  "version": "1.3.0",
+  "minAppVersion": "1.4.0",
+  "description": "Two-way sync between a Google Drive MicroJournal folder and a vault folder. Drive .txt files appear as .md notes and edits push back.",
+  "author": "Fouad",
+  "isDesktopOnly": false
+}

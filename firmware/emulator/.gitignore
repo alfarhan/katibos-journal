@@ -1,0 +1,10 @@
+# build output
+build/
+microjournal-emu
+*.o
+
+# runtime data + verification scratch
+sdcard/
+*.pgm
+*.png
+keylog.txt

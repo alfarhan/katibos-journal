@@ -1,0 +1,20 @@
+{
+  "name": "microjournal-sync",
+  "version": "1.0.0",
+  "description": "Two-way sync between a Google Drive MicroJournal folder and an Obsidian vault folder.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+  },
+  "keywords": [],
+  "author": "Fouad",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.21.5",
+    "obsidian": "^1.5.0",
+    "typescript": "^5.4.0"
+  }
+}
