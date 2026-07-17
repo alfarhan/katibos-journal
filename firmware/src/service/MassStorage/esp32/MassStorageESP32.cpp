@@ -2,6 +2,7 @@
 
 #include "app/app.h"
 #include "MassStorageESP32.h"
+#include "service/MassStorage/MassStorageDescriptor.h"
 
 USBMSC FatFSUSBClass::msc;
 wl_handle_t FatFSUSBClass::wlHandle = WL_INVALID_HANDLE;
@@ -166,9 +167,9 @@ bool FatFSUSBClass::begin()
         return false;
     }
 
-    msc.vendorID("ESP32S3");
-    msc.productID("FlashDisk");
-    msc.productRevision("1.0");
+    msc.vendorID(msc_descriptor::VENDOR_ID);
+    msc.productID(msc_descriptor::PRODUCT_ID);
+    msc.productRevision(msc_descriptor::PRODUCT_REVISION);
 
     msc.onRead(readCallback);
     msc.onWrite(writeCallback);
