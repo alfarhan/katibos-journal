@@ -21,9 +21,11 @@ and trimmed to the rev_8 OS only.
 | [`firmware/emulator/`](firmware/emulator) | SDL desktop emulator (build & run the OS with no hardware). |
 | [`firmware/tests/`](firmware/tests) | Host unit tests. |
 | [`firmware/doc/KATIBOS.md`](firmware/doc/KATIBOS.md) | Detailed design / feature doc. |
-| [`micro-journal-rev-8/`](micro-journal-rev-8) | Hardware package — STL/CAD, build guide, images. |
 
 Version: `KATIBOS_VERSION` in [`firmware/src/app/app.h`](firmware/src/app/app.h).
+
+Hardware (enclosure STLs, build guide) lives upstream:
+[unkyulee/micro-journal › micro-journal-rev-8](https://github.com/unkyulee/micro-journal/tree/main/micro-journal-rev-8).
 
 ## Build & run
 
