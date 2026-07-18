@@ -102,6 +102,11 @@ public:
     void pageForward();
     void advanceWindow();
 
+    // Guards the (slow, file-I/O) window loads against re-entry: a load can
+    // take long enough that the auto-repeat engine re-triggers paging mid-load,
+    // overlapping two window swaps and corrupting the refresh.
+    bool pagingInProgress = false;
+
     // Jump the caret to the very start / end of the file, sliding the window
     // there first when the target is outside the loaded region.
     void goToDocTop();
