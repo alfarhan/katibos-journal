@@ -166,6 +166,6 @@ void Help_keyboard(int key)
     if (key == 'T' || key == 't') { app["screen"] = KEYBOARDSCREEN; return; }
     if ((key == 'S' || key == 's') && !app["config"]["sync"]["url"].as<String>().isEmpty())
     { app["menu"]["state"] = MENU_SYNC; return; }
-    if ((key == 'P' || key == 'p') && !app["config"]["update"]["url"].as<String>().isEmpty())
+    if (key == 'P' || key == 'p')
     { app["menu"]["state"] = MENU_UPDATE; return; }
 }

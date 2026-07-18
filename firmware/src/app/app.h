@@ -4,7 +4,12 @@
 #define VERSION "2.0.0709"
 
 // katibOS layer version (menu/UX redesign on top of the base firmware)
-#define KATIBOS_VERSION "1.3.1"
+#define KATIBOS_VERSION "1.3.2"
+
+// Official OTA manifest. Used whenever config["update"]["url"] is missing or
+// still carries the pre-rename URL that now 404s, so a stale SD-card config
+// can't break update checks.
+#define KATIBOS_UPDATE_URL "https://raw.githubusercontent.com/alfarhan/katibos/main/firmware/latest.json"
 
 // default utility headers
 #include <ArduinoJson.h>

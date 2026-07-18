@@ -329,7 +329,7 @@ void Home_keyboard(char key)
         app["menu"]["state"] = MENU_SYNC;
         return;
     }
-    if ((key == 'P' || key == 'p') && !app["config"]["update"]["url"].as<String>().isEmpty())
+    if (key == 'P' || key == 'p')
     {
         app["menu"]["return"] = MENU_HOME;
         app["menu"]["state"] = MENU_UPDATE;

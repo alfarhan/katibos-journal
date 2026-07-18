@@ -35,8 +35,7 @@ static int buildList(int *ids)
         ids[n++] = ACT_SYNC;
     ids[n++] = ACT_BLE;
     ids[n++] = ACT_DRIVE;
-    if (!app["config"]["update"]["url"].as<String>().isEmpty())
-        ids[n++] = ACT_UPDATE;
+    ids[n++] = ACT_UPDATE; // always available via built-in fallback URL
     ids[n++] = ACT_HELP;
     return n;
 }

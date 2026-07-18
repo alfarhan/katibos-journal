@@ -57,6 +57,17 @@ static bool ota_ensure_wifi()
 #endif
 }
 
+String ota_update_url()
+{
+    JsonDocument &app = status();
+    String url = app["config"]["update"]["url"].as<String>();
+    // Fall back to the built-in channel when the config has no URL, or still
+    // carries the pre-rename URL (alfarhan/micro-journal) that now 404s.
+    if (url.isEmpty() || url == "null" || url.indexOf("alfarhan/micro-journal") >= 0)
+        return KATIBOS_UPDATE_URL;
+    return url;
+}
+
 void ota_check()
 {
     JsonDocument &app = status();
@@ -68,12 +79,7 @@ void ota_check()
         return;
     }
 
-    String url = app["config"]["update"]["url"].as<String>();
-    if (url.isEmpty() || url == "null")
-    {
-        setState(OTA_ERROR, "No update URL set in config");
-        return;
-    }
+    String url = ota_update_url();
 
     setState(OTA_CHECKING, "Checking for update...");
     SyncHttp r = sync_http_get(url);

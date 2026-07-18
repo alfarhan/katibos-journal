@@ -22,6 +22,10 @@
 #define OTA_DONE 5
 #define OTA_ERROR -1
 
+// Effective manifest URL: the config override when it's a live URL, otherwise
+// the built-in KATIBOS_UPDATE_URL (also used to replace the stale pre-rename
+// URL). Never empty, so the update option is always reachable.
+String ota_update_url();
 // Connect Wi-Fi (device), fetch the manifest, compare versions. Blocking.
 void ota_check();
 // Download app["ota_url"] and flash it to the inactive slot. Blocking.
