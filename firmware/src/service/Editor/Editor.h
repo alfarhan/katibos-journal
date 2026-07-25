@@ -103,9 +103,12 @@ public:
     void advanceWindow();
 
     // Guards the (slow, file-I/O) window loads against re-entry: a load can
-    // take long enough that the auto-repeat engine re-triggers paging mid-load,
-    // overlapping two window swaps and corrupting the refresh.
-    bool pagingInProgress = false;
+    // take long enough that paging is re-triggered mid-load, overlapping two
+    // window swaps and corrupting the refresh. Cross-core: real keypresses call
+    // paging on core 0 (keyboard_loop) while the auto-repeat engine re-injects
+    // it from Editor::loop on the display core (default core 1), so this must be
+    // volatile to keep the flag from being hoisted into a register.
+    volatile bool pagingInProgress = false;
 
     // Jump the caret to the very start / end of the file, sliding the window
     // there first when the target is outside the loaded region.
