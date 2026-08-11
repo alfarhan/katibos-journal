@@ -33,6 +33,7 @@ void display_loop();
 void keyboard_setup();
 void keyboard_loop();
 void keyboard_HID2Ascii(uint8_t keycode, uint8_t modifier, bool pressed);
+void display_keyboard(int key, bool pressed, int index);
 
 static const int SCALE = 2;
 
@@ -185,6 +186,26 @@ static int dump_frame(const char *path)
     // final dump, e.g. EMU_KEYS=41 sends Esc(0x29) to open the MENU. Each code
     // is sent as a press+release. Lets the headless dump exercise other screens.
     // Prefix a code with 'c' to hold Ctrl (e.g. c44 = Ctrl+Space = layout toggle).
+    // EMU_TEXT: type a raw UTF-8 string straight into the editor (each code point
+    // inserted via display_keyboard, bypassing HID/layout) so Arabic can be
+    // previewed without simulating an Arabic keyboard.
+    const char *text = getenv("EMU_TEXT");
+    if (text && *text)
+    {
+        const unsigned char *p = (const unsigned char *)text;
+        while (*p)
+        {
+            unsigned int cp = 0;
+            if (*p < 0x80) { cp = *p; p += 1; }
+            else if ((*p & 0xE0) == 0xC0) { cp = ((*p & 0x1F) << 6) | (p[1] & 0x3F); p += 2; }
+            else if ((*p & 0xF0) == 0xE0) { cp = ((*p & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F); p += 3; }
+            else { p += 1; continue; }
+            display_keyboard((int)cp, true, -1);
+            display_keyboard((int)cp, false, -1);
+        }
+        for (int i = 0; i < 8; i++) { display_loop(); SDL_Delay(30); }
+    }
+
     const char *keys = getenv("EMU_KEYS");
     if (keys && *keys)
     {

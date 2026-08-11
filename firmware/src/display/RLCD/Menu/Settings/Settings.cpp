@@ -3,13 +3,11 @@
 #include "app/app.h"
 #include "display/display.h"
 #include "display/RLCD/Menu/FileList/Pagination.h"
-#include "../Timezone/Timezone.h" // tz_label
 
 enum
 {
     ACT_PREFS,
     ACT_LANGUAGE,
-    ACT_TIMEZONE,
     ACT_WIFI,
     ACT_SYNC,
     ACT_SYNCPROV,
@@ -53,7 +51,6 @@ static const char *actionLabel(int act)
     {
     case ACT_PREFS: return "Preferences";
     case ACT_LANGUAGE: return "Language";
-    case ACT_TIMEZONE: return "Time zone";
     case ACT_WIFI: return "Wi-Fi";
     case ACT_SYNC: return "Sync & Backup";
     case ACT_SYNCPROV: return "Sync provider";
@@ -85,7 +82,6 @@ static void dispatch(int act)
     {
     case ACT_PREFS: app["menu"]["prefs_from_editor"] = false; app["menu"]["state"] = MENU_PREFS; break;
     case ACT_LANGUAGE: app["menu"]["state"] = MENU_LAYOUT; break;
-    case ACT_TIMEZONE: app["menu"]["state"] = MENU_TIMEZONE; break;
     case ACT_WIFI: app["menu"]["state"] = MENU_WIFI; break;
     case ACT_SYNC:
         // Reachable when a Drive URL is set OR the provider is git (git syncs
@@ -161,12 +157,6 @@ void Settings_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             u8->setCursor(xr - u8->getUTF8Width(loc.c_str()), y);
             u8->print(loc.c_str());
         }
-        else if (ids[r] == ACT_TIMEZONE)
-        {
-            String tz = tz_label(app["config"]["timezone"] | 180);
-            u8->setCursor(xr - u8->getUTF8Width(tz.c_str()), y);
-            u8->print(tz.c_str());
-        }
         else if (ids[r] == ACT_SYNCPROV)
         {
             const char *prov =
@@ -217,11 +207,6 @@ void Settings_keyboard(int key)
     if (key == 18 || key == 'B' || key == 'b' || key == '\b') // Left / Back -> Files
     {
         app["menu"]["state"] = MENU_HOME;
-        return;
-    }
-    if (key == 19) // Right -> Stats
-    {
-        app["menu"]["state"] = MENU_STATS;
         return;
     }
     if (key == 27 || key == MENU) // Esc -> editor

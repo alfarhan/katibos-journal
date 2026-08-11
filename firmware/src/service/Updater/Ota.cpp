@@ -33,10 +33,7 @@ static bool ota_ensure_wifi()
 
     wifi_config_load();
     WiFi.mode(WIFI_STA);
-    {
-        String hn = app["config"]["device_name"].as<String>();
-        WiFi.setHostname((hn.isEmpty() || hn == "null") ? "MICROJOURNAL" : hn.c_str());
-    }
+    WiFi.setHostname("MICROJOURNAL");
     delay(2000);
 
     int n = WiFi.scanNetworks();

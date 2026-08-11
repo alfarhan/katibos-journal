@@ -17,10 +17,6 @@ void _set_default_config()
     app["config"]["sync"]["url"] = "";
     app["config"]["ble"]["remote"] = "";
 
-    // writing stats (STATS tab)
-    app["config"]["daily_goal"] = 500;
-    app["config"]["today_words"] = 0;
-    app["config"]["streak"] = 0;
 
     //
     config_save();

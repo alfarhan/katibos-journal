@@ -8,7 +8,6 @@
 #include "service/Buffer/BufferService.h"
 #include "service/Tools/TextUtil.h"
 #include "service/Bidi/Bidi.h"
-#include "service/Clock/Clock.h"
 
 void Rename_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
@@ -105,16 +104,6 @@ void Rename_keyboard(int key)
             for (int r = 0; r < n - k; r++)
                 buffer_remove();
         }
-    }
-
-    // Ctrl+D: insert the date+time into the title (same source as the editor).
-    // Only when a date is known (string starts with a digit, not "----------").
-    else if (key == DATE_INSERT)
-    {
-        String d = clock_datestr();
-        if (d.length() >= 10 && d[0] >= '0' && d[0] <= '9')
-            for (int i = 0; i < (int)d.length(); i++)
-                buffer_add(d[i]);
     }
 
     // Printable character (ASCII or any layout's Unicode codepoint). Mirror the

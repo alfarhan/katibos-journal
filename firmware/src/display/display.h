@@ -9,7 +9,6 @@
 //
 #define ERRORSCREEN 1
 #define MENUSCREEN 2
-#define WAKEUPSCREEN 3
 #define SLEEPSCREEN 4
 #define UPDATESCREEN 6
 
@@ -31,13 +30,10 @@
 #define MENU_RENAME 16
 #define MENU_SETTINGS 17
 #define MENU_HELP 18
-#define MENU_STATS 19
 #define MENU_ABOUT 20
 #define MENU_UPDATE 21
-#define MENU_TIMEZONE 22
 #define MENU_SYNCPROV 23
 #define MENU_PREFS 24
-#define MENU_DEVNAME 25
 #define MENU_FACTORY 26
 
 // MENU button

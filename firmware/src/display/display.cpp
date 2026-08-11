@@ -35,18 +35,8 @@ void display_setup()
     // if screen is not specified
     // then load the wake animation then the word processor
     //
-    bool disabledWakeUp = app["config"]["wakeup_animation_disabled"].as<bool>();
-
-    if (disabledWakeUp)
-    {
-      // show the word processor immediately when wakeup is disabled
-      app["screen"] = WORDPROCESSOR;
-    }
-    else
-    {
-      // show wakeup screen
-      app["screen"] = WAKEUPSCREEN;
-    }
+    // boot straight into the editor
+    app["screen"] = WORDPROCESSOR;
   }
 
   //

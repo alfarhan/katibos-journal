@@ -296,7 +296,7 @@ void keyboard_keypad_68_loop()
             return; // ignore \r key
 
         // Terminal arrow/nav keys arrive as ANSI escape sequences; decode them
-        // to the internal codes so menu tabs (Files/Settings/Stats) and editor
+        // to the internal codes so menu tabs (Files/Settings) and editor
         // caret movement work over serial. A decoded nav key is dispatched here
         // and returns, so it bypasses the control-byte shortcut mapping below
         // (which shares the same small code values). A bare Esc (k == 27) falls

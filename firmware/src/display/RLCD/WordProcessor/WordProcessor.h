@@ -5,6 +5,10 @@
 //
 void WP_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8);
 
+// Runtime-selected Arabic font (config.arabic_font / arabic_size). Shared with
+// the label renderer so menus/titles use the same face.
+const uint8_t *wp_arabic_font();
+
 //
 void WP_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8);
 

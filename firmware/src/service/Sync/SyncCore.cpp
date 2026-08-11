@@ -3,7 +3,6 @@
 #include "app/app.h"
 #include "display/display.h"
 #include "service/Tools/Tools.h"
-#include "service/Clock/Clock.h"
 
 static const int SLOT_MAX = 100;
 
@@ -232,9 +231,6 @@ bool sync_upload_index(JsonDocument &app, int index, const String &baseUrl)
         app["config"][format("synced_hash_%d", index)] = hash_file(path);
         app["config"][format("synced_title_%d", index)] = title;
         app["config"][format("unsynced_%d", index)] = false;
-        int day = clock_localday();
-        if (day > 0)
-            app["config"][format("synced_day_%d", index)] = day;
     }
     return ok;
 }
@@ -804,9 +800,6 @@ static void gh_apply_pending(JsonDocument &app, const GhPending &p)
     app["config"][format("synced_hash_%d", p.slot)] = p.hash;
     app["config"][format("synced_title_%d", p.slot)] = p.title;
     app["config"][format("unsynced_%d", p.slot)] = false;
-    int day = clock_localday();
-    if (day > 0)
-        app["config"][format("synced_day_%d", p.slot)] = day;
 }
 
 // Commit every staged change in ONE commit (blobs are already uploaded). Builds

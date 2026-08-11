@@ -14,15 +14,11 @@
 #include "Bluetooth/Bluetooth.h"
 #include "Settings/Settings.h"
 #include "Help/Help.h"
-#include "Stats/Stats.h"
 #include "About/About.h"
 #include "Ota/Ota.h"
-#include "Timezone/Timezone.h"
 #include "SyncProvider/SyncProvider.h"
 #include "Preferences/Preferences.h"
-#include "DeviceName/DeviceName.h"
 #include "FactoryReset/FactoryReset.h"
-#include "service/Clock/Clock.h"
 
 // state
 bool menu_clear = false;
@@ -174,13 +170,6 @@ void Menu_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
         Help_render(display, u8);
     }
-    else if (menu_state == MENU_STATS)
-    {
-        if (menu_state_prev != menu_state)
-            Stats_setup(display, u8);
-
-        Stats_render(display, u8);
-    }
     else if (menu_state == MENU_ABOUT)
     {
         if (menu_state_prev != menu_state)
@@ -195,13 +184,6 @@ void Menu_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
         Ota_render(display, u8);
     }
-    else if (menu_state == MENU_TIMEZONE)
-    {
-        if (menu_state_prev != menu_state)
-            Timezone_setup(display, u8);
-
-        Timezone_render(display, u8);
-    }
     else if (menu_state == MENU_SYNCPROV)
     {
         if (menu_state_prev != menu_state)
@@ -215,13 +197,6 @@ void Menu_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             Preferences_setup(display, u8);
 
         Preferences_render(display, u8);
-    }
-    else if (menu_state == MENU_DEVNAME)
-    {
-        if (menu_state_prev != menu_state)
-            DeviceName_setup(display, u8);
-
-        DeviceName_render(display, u8);
     }
     else if (menu_state == MENU_FACTORY)
     {
@@ -332,12 +307,6 @@ void Menu_keyboard(int key)
         return;
     }
 
-    // Stats
-    else if (menu_state == MENU_STATS)
-    {
-        Stats_keyboard(key);
-        return;
-    }
     // About
     else if (menu_state == MENU_ABOUT)
     {
@@ -350,12 +319,6 @@ void Menu_keyboard(int key)
         Ota_keyboard(key);
         return;
     }
-    // Time zone
-    else if (menu_state == MENU_TIMEZONE)
-    {
-        Timezone_keyboard(key);
-        return;
-    }
     else if (menu_state == MENU_SYNCPROV)
     {
         SyncProvider_keyboard(key);
@@ -364,11 +327,6 @@ void Menu_keyboard(int key)
     else if (menu_state == MENU_PREFS)
     {
         Preferences_keyboard(key);
-        return;
-    }
-    else if (menu_state == MENU_DEVNAME)
-    {
-        DeviceName_keyboard(key);
         return;
     }
     else if (menu_state == MENU_FACTORY)
@@ -419,31 +377,6 @@ void Menu_drawTabs(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, in
     {
         u8->setForegroundColor(ST7305_COLOR_BLACK);
         u8->setBackgroundColor(ST7305_COLOR_WHITE);
-    }
-
-    // STATS
-    if (activeTab == 2)
-    {
-        display->drawFilledRectangle(178, y - 14, 240, y + 4, 1);
-        u8->setForegroundColor(ST7305_COLOR_WHITE);
-        u8->setBackgroundColor(ST7305_COLOR_BLACK);
-    }
-    u8->setCursor(184, y);
-    u8->print("STATS");
-    if (activeTab == 2)
-    {
-        u8->setForegroundColor(ST7305_COLOR_BLACK);
-        u8->setBackgroundColor(ST7305_COLOR_WHITE);
-    }
-
-    // today's date, right-aligned in the header band (shared across FILES /
-    // SETTINGS / STATS); "----------" until the clock is set or synced
-    {
-        u8->setForegroundColor(ST7305_COLOR_BLACK);
-        u8->setBackgroundColor(ST7305_COLOR_WHITE);
-        String ds = clock_datestr();
-        u8->setCursor(392 - u8->getUTF8Width(ds.c_str()), y);
-        u8->print(ds.c_str());
     }
 
     // divider under the header tabs

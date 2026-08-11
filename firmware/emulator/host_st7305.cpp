@@ -104,6 +104,7 @@ void ST7305_4p2_BW_DisplayDriver::Low_Power_Mode() {}
 void ST7305_4p2_BW_DisplayDriver::High_Power_Mode() {}
 void ST7305_4p2_BW_DisplayDriver::display_on(bool) {}
 void ST7305_4p2_BW_DisplayDriver::display_Inversion(bool) {}
+void ST7305_4p2_BW_DisplayDriver::setInvert(bool) {}
 
 // private helpers (unused on host)
 void ST7305_4p2_BW_DisplayDriver::address() {}

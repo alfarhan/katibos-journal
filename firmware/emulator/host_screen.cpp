@@ -37,8 +37,6 @@ void host_menu_repaint()
 bool host_is_fake_screen()
 {
     int screen = host_screen();
-    if (screen == KEYBOARDSCREEN)
-        return true;
     if (screen == MENUSCREEN)
     {
         int m = host_menu_state();

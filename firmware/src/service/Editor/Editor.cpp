@@ -6,7 +6,6 @@
 #include "service/WordCounter/WordCounter.h"
 #include "service/Bidi/Bidi.h"
 #include "service/Tools/TextUtil.h"
-#include "service/Clock/Clock.h"
 #include "service/Editor/EditorWindow.h"
 #include "service/Editor/WordNav.h"
 
@@ -417,30 +416,6 @@ bool Editor::saveFile()
     wordCountBuffer = wordcounter_buffer(buffer);
     int file_index = app["config"]["file_index"].as<int>();
     app["config"][format("wordcount_buffer_%d", file_index)] = wordCountBuffer;
-
-    // Settle any day boundary before attributing words, so writing past midnight
-    // counts toward the new day (no-op until the clock is confirmed this session).
-    clock_tick();
-
-    // Writing stats: accumulate this file's net word growth into today's total
-    // and the (RAM-only, resets on boot) session total. The per-file baseline
-    // last_wc_N is the full-document count at the previous save; a missing
-    // baseline (first save after the feature shipped, or a brand-new file just
-    // opened) is seeded WITHOUT counting pre-existing content as written today.
-    {
-        int full = app["config"][format("wordcount_file_%d", file_index)].as<int>() + wordCountBuffer;
-        String bkey = format("last_wc_%d", file_index);
-        if (app["config"][bkey].is<int>())
-        {
-            int delta = full - app["config"][bkey].as<int>();
-            if (delta > 0)
-            {
-                app["config"]["today_words"] = app["config"]["today_words"].as<int>() + delta;
-                app["session_words"] = app["session_words"].as<int>() + delta;
-            }
-        }
-        app["config"][bkey] = full;
-    }
 
     // Auto-title: cache the first non-empty line so menus / status bar can label
     // the file without re-reading it. A manual title (set via Rename) wins, so

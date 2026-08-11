@@ -11,15 +11,44 @@
 #include "service/Bidi/Bidi.h"
 #include "service/Tools/TextUtil.h"
 #include "service/Sync/Sync.h"
-#include "service/Clock/Clock.h"
 #include "app/Config/Config.h"
 #include "display/RLCD/Menu/Help/Help.h"
 #include "display/RLCD/Menu/Menu.h"
 #include <string.h>
 
-// Arabic glyphs are drawn from a fixed-width font that carries the connected
-// presentation forms; Latin/ASCII keeps the existing ProFont.
-#define WP_FONT_ARABIC u8g2_font_10x20_t_arabic
+// Arabic glyphs are drawn from a font that carries the connected presentation
+// forms; Latin/ASCII keeps the existing ProFont. The Arabic face + size are
+// runtime-selectable (Preferences): config.arabic_font 0 = Default (10x20),
+// 1 = IBM Plex Bold; config.arabic_size 0/1/2 = Small/Normal/Large (IBM only).
+const uint8_t *wp_arabic_font()
+{
+    JsonDocument &app = status();
+    if ((app["config"]["arabic_font"] | 1) == 0)
+        return u8g2_font_10x20_t_arabic;
+    switch (app["config"]["arabic_size"] | 1)
+    {
+    case 0: return u8g2_font_ibmplex_arabic_s;
+    case 2: return u8g2_font_ibmplex_arabic_l;
+    default: return u8g2_font_ibmplex_arabic_m;
+    }
+}
+
+// Extra baseline-to-baseline pitch for the taller IBM sizes, so lines don't
+// overlap (Large) or waste space (Small). Default face keeps its ~20px pitch.
+static int wp_arabic_pitch_extra()
+{
+    JsonDocument &app = status();
+    if ((app["config"]["arabic_font"] | 1) == 0)
+        return 0;
+    switch (app["config"]["arabic_size"] | 1)
+    {
+    case 0: return -2; // Small
+    case 2: return 6;  // Large
+    default: return 0; // Normal
+    }
+}
+
+#define WP_FONT_ARABIC wp_arabic_font()
 
 //
 int STATUSBAR_Y = 295;
@@ -83,12 +112,13 @@ int editY = cursorY - 6;
 // fit more lines - fine for unvocalized Arabic, but harakat/tashkīl can touch.
 static int linePitchFor(int spacing)
 {
+    int extra = wp_arabic_pitch_extra();
     switch (spacing)
     {
-    case 1: return 26;           // Relaxed
-    case 2: return 30;           // Spacious
-    case 3: return 20;           // Compact
-    default: return font_height; // Normal (22)
+    case 1: return 26 + extra;           // Relaxed
+    case 2: return 30 + extra;           // Spacious
+    case 3: return 20 + extra;           // Compact
+    default: return font_height + extra; // Normal (22)
     }
 }
 
@@ -1170,26 +1200,6 @@ void WP_keyboard(int key, bool pressed, int index)
 
     // Ctrl+, (Preferences) is handled directly in keyboard.cpp so the shortcut
     // works from the editor and any menu screen alike.
-
-    // Insert the date+time at the caret (Ctrl+D). clock_datestr() is
-    // "YYYY-MM-DD HH:MM" when the clock is live, "YYYY-MM-DD" when only a cached
-    // date is known (no live time), and "----------" when never set - only
-    // insert when it starts with a digit, so an unknown date inserts nothing
-    // instead of dashes. Fed through the normal typing path (press+release per
-    // char) so it flips saved and is undoable, exactly like typing it by hand.
-    if (key == DATE_INSERT)
-    {
-        String d = clock_datestr();
-        if (d.length() >= 10 && d[0] >= '0' && d[0] <= '9')
-        {
-            for (int i = 0; i < (int)d.length(); i++)
-            {
-                Editor::getInstance().keyboard(d[i], true);
-                Editor::getInstance().keyboard(d[i], false);
-            }
-        }
-        return;
-    }
 
     // Toggle the bottom status bar (Ctrl+H / Fn+H)
     if (key == STATUSBAR)

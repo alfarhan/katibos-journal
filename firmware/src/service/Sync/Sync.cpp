@@ -9,37 +9,10 @@
 #include <WiFiClientSecure.h>
 #include <base64.h>
 #include <time.h>
-#include "service/Clock/Clock.h"
 #include "app/Config/Config.h"
 #include "service/WifiEntry/WifiEntry.h"
 #include <vector>
 #include <algorithm>
-
-// Parse an HTTP "Date:" header (RFC 1123, e.g. "Wed, 24 Jun 2026 07:28:00 GMT")
-// to a UTC epoch. Returns 0 if it can't be parsed. Fallback date source when
-// NTP is unreachable (some networks block its UDP).
-static long parseHttpDate(const String &h)
-{
-    if (h.isEmpty())
-        return 0;
-    int comma = h.indexOf(',');
-    String s = (comma >= 0) ? h.substring(comma + 1) : h;
-    s.trim();
-
-    int d, y, hh, mm, ss;
-    char mon[4] = {0};
-    if (sscanf(s.c_str(), "%d %3s %d %d:%d:%d", &d, mon, &y, &hh, &mm, &ss) != 6)
-        return 0;
-
-    const char *months = "JanFebMarAprMayJunJulAugSepOctNovDec";
-    const char *p = strstr(months, mon);
-    if (!p)
-        return 0;
-    int m = (int)((p - months) / 3) + 1;
-
-    long days = clock_days_from_civil(y, (unsigned)m, (unsigned)d);
-    return days * 86400L + hh * 3600L + mm * 60L + ss;
-}
 
 // Scan nearby networks (device: real radio). Dedupes SSIDs keeping the strongest
 // signal, drops hidden (empty) SSIDs, sorts by RSSI desc.
@@ -162,10 +135,7 @@ void sync_start()
 
     // Scan for available networks
     WiFi.mode(WIFI_STA);
-    {
-        String hn = app["config"]["device_name"].as<String>();
-        WiFi.setHostname((hn.isEmpty() || hn == "null") ? "MICROJOURNAL" : hn.c_str());
-    }
+    WiFi.setHostname("MICROJOURNAL");
 
     // wait for decent amount of time before using wifi
     delay(3000);
@@ -295,18 +265,6 @@ bool sync_connect_wifi(JsonDocument &app, const char *ssid, const char *password
         app["network"]["ssid"] = ssid;
         app["network"]["status"] = 1;
 
-        // Now that we're online, learn the real date via NTP (UTC; the Clock
-        // applies its own KSA offset). Feeds the streak/Today rollover. Best
-        // effort - a failure just leaves the clock on its last known value.
-        configTime(0, 0, "pool.ntp.org", "time.google.com");
-        struct tm ti;
-        if (getLocalTime(&ti, 5000))
-        {
-            time_t now = time(nullptr);
-            if (now > 1700000000) // sanity: after 2023-11
-                clock_set_epoch((long)now);
-        }
-
         // print info
         app["sync_message"] = format("Connected - %s, %s\n", ssid, WiFi.localIP().toString().c_str());
         app["clear"] = true;
@@ -418,15 +376,6 @@ SyncHttp sync_http_post_file(const String &url, const String &filePath)
             r.body = http.getString();
         file.close();
         delay(100);
-
-        // first time online this session, set the clock from the Date header if
-        // NTP didn't (the streak/Today rollover needs a confirmed time)
-        if (r.code > 0 && r.code < 400 && !clock_confirmed())
-        {
-            long ep = parseHttpDate(http.header("Date"));
-            if (ep > 1700000000) // sanity: after 2023-11
-                clock_set_epoch(ep);
-        }
     }
     http.end();
     return r;

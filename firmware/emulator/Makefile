@@ -40,19 +40,15 @@ FW_CPP := \
   $(SRC)/display/RLCD/Menu/Rename/Rename.cpp \
   $(SRC)/display/RLCD/Menu/Settings/Settings.cpp \
   $(SRC)/display/RLCD/Menu/Help/Help.cpp \
-  $(SRC)/display/RLCD/Menu/Stats/Stats.cpp \
   $(SRC)/display/RLCD/Menu/About/About.cpp \
   $(SRC)/display/RLCD/Menu/Ota/Ota.cpp \
-  $(SRC)/display/RLCD/Menu/Timezone/Timezone.cpp \
   $(SRC)/display/RLCD/Menu/SyncProvider/SyncProvider.cpp \
   $(SRC)/display/RLCD/Menu/Preferences/Preferences.cpp \
-  $(SRC)/display/RLCD/Menu/DeviceName/DeviceName.cpp \
   $(SRC)/display/RLCD/Menu/FactoryReset/FactoryReset.cpp \
   $(SRC)/service/Updater/Ota.cpp \
-  $(SRC)/service/Clock/Clock.cpp \
-  $(SRC)/display/RLCD/KeyboardScreen/KeyboardScreen.cpp \
+  $(SRC)/display/RLCD/Menu/Bluetooth/Bluetooth.cpp \
+  $(SRC)/keyboard/BLEHost/BLEHost.cpp \
   $(SRC)/service/WifiEntry/WifiEntry.cpp \
-  $(SRC)/service/Send/Send.cpp \
   $(SRC)/display/RLCD/ErrorScreen/ErrorScreen.cpp \
   $(SRC)/display/RLCD/Update/Update.cpp \
   $(SRC)/keyboard/keyboard.cpp \

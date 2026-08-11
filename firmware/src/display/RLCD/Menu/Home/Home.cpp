@@ -7,7 +7,6 @@
 //
 #include "service/Editor/Editor.h"
 #include "service/Tools/TextUtil.h"
-#include "service/Clock/Clock.h"
 #include "display/RLCD/display_RLCD.h"
 #include "display/RLCD/Menu/FileList/Pagination.h"
 
@@ -32,26 +31,6 @@ static int Home_wordCount(int idx)
     JsonDocument &app = status();
     return app["config"][format("wordcount_file_%d", idx)].as<int>() +
            app["config"][format("wordcount_buffer_%d", idx)].as<int>();
-}
-
-// Relative-age label for a slot's last successful sync ("today", "3d"). Empty
-// when the slot has no recorded sync day, or the clock isn't confirmed this
-// session (no "today" to measure against). Lets the ✓ read as "synced N ago".
-static String Home_syncAge(int idx)
-{
-    JsonDocument &app = status();
-    int sd = app["config"][format("synced_day_%d", idx)].as<int>();
-    if (sd <= 0)
-        return String("");
-    int today = clock_localday();
-    if (today <= 0)
-        return String("");
-    int days = today - sd;
-    if (days <= 0)
-        return String("today");
-    char b[8];
-    snprintf(b, sizeof(b), "%dd", days > 99 ? 99 : days);
-    return String(b);
 }
 
 // Per-file sync marker, drawn just left of the word count: a checkmark when the
@@ -171,18 +150,6 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         bool synced = !app["config"][format("unsynced_%d", idx)].as<bool>();
         Home_drawSyncMark(display, cntX - 6, y, synced,
                           focused ? ST7305_COLOR_WHITE : ST7305_COLOR_BLACK);
-
-        // for synced files, show how long ago (right-aligned, left of the mark)
-        if (synced)
-        {
-            String age = Home_syncAge(idx);
-            if (!age.isEmpty())
-            {
-                int ageX = (cntX - 15) - 4 - u8->getUTF8Width(age.c_str());
-                u8->setCursor(ageX, y);
-                u8->print(age.c_str());
-            }
-        }
 
         String title = app["config"][format("title_%d", idx)].as<String>();
         if (title.isEmpty() || title == "null")
