@@ -10,11 +10,15 @@ void Menu_clear();
 #include <vector>
 #include <string>
 #include <NimBLEDevice.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 
 #include "app/app.h"
 #include "keyboard/keyboard.h"
 
 static const NimBLEUUID UUID_HID_SERVICE((uint16_t)0x1812);
+static const NimBLEUUID UUID_PROTOCOL_MODE((uint16_t)0x2A4E);   // 0=Boot, 1=Report
+static const NimBLEUUID UUID_BOOT_KB_INPUT((uint16_t)0x2A22);   // 8-byte boot report
 static const uint16_t APPEARANCE_KEYBOARD = 0x03C1;
 static const uint32_t DISCOVER_MS = 6000;
 
@@ -33,7 +37,22 @@ static volatile bool g_wantConnect = false;
 static volatile bool g_scanDone = false;
 static volatile bool g_connected = false;
 static uint8_t g_prevKeys[6] = {0};
+static uint8_t g_prevMod = 0;
 static std::vector<NimBLEAddress> g_listAddrs; // parallel to app["ble"]["devices"]
+
+// onNotify() runs on the NimBLE host task; the editor/display it feeds are
+// owned by the main loop task. Hand key edges across via a queue and apply them
+// in blehost_loop() so editing never happens from the BLE callback context.
+struct BleKeyEvent { uint8_t code; uint8_t mod; bool pressed; };
+static QueueHandle_t g_keyQueue = nullptr;
+
+static void enqueueKey(uint8_t code, uint8_t mod, bool pressed)
+{
+    if (!g_keyQueue)
+        return;
+    BleKeyEvent ev{code, mod, pressed};
+    xQueueSend(g_keyQueue, &ev, 0); // drop if full rather than block the BLE task
+}
 
 static void setStatus(const char *s)
 {
@@ -64,15 +83,27 @@ static void onNotify(NimBLERemoteCharacteristic *chr, uint8_t *data, size_t len,
     {
         uint8_t pk = g_prevKeys[i];
         if (pk >= 0x04 && !inReport(keys, pk))
-            keyboard_HID2Ascii(pk, mod, false);
+            enqueueKey(pk, mod, false);
     }
     for (int i = 0; i < 6; i++)
     {
         uint8_t nk = keys[i];
         if (nk >= 0x04 && !inReport(g_prevKeys, nk))
-            keyboard_HID2Ascii(nk, mod, true);
+            enqueueKey(nk, mod, true);
     }
     memcpy(g_prevKeys, keys, 6);
+
+    // Both Cmd keys together (left-GUI + right-GUI) = back/menu, an easy thumb
+    // chord for Mac keyboards that lack an Esc. Fire on the chord's edges by
+    // injecting a synthetic Esc (0x29), reusing the Esc->MENU mapping.
+    const uint8_t BOTH_GUI = 0x88; // LEFTGUI(0x08) | RIGHTGUI(0x80)
+    bool nowBoth = (mod & BOTH_GUI) == BOTH_GUI;
+    bool wasBoth = (g_prevMod & BOTH_GUI) == BOTH_GUI;
+    if (nowBoth && !wasBoth)
+        enqueueKey(0x29, mod, true);
+    else if (!nowBoth && wasBoth)
+        enqueueKey(0x29, mod, false);
+    g_prevMod = mod;
 }
 
 class HostScanCallbacks : public NimBLEScanCallbacks
@@ -189,6 +220,13 @@ static void connectToKeyboard()
         c = NimBLEDevice::createClient(g_target);
     c->setClientCallbacks(&g_clientCB, false);
 
+    // HID keyboards (e.g. Logitech Keys-To-Go) drop the link within seconds if
+    // the central keeps its default connection params: they expect a short
+    // interval and a supervision timeout long enough to survive their slave
+    // latency. Negotiate keyboard-friendly params before connecting.
+    // Units: interval x1.25ms, timeout x10ms -> 15-30ms interval, 5s timeout.
+    c->setConnectionParams(12, 24, 0, 500);
+
     if (!c->connect(g_target))
     {
         _log("[blehost] connect failed\n");
@@ -212,10 +250,28 @@ static void connectToKeyboard()
         return;
     }
 
+    // Force Boot Protocol. HID keyboards default to Report Protocol, where each
+    // sends input on 0x2A4D in a device-specific layout onNotify() can't decode.
+    // Writing 0 to Protocol Mode makes the keyboard emit the standard 8-byte
+    // boot report (mods, reserved, six usage codes) on 0x2A22 instead.
+    if (auto *pm = hid->getCharacteristic(UUID_PROTOCOL_MODE))
+    {
+        uint8_t boot = 0;
+        pm->writeValue(&boot, 1, false); // write without response
+    }
+
     int subs = 0;
-    for (auto *ch : hid->getCharacteristics(true))
-        if (ch->canNotify() && ch->subscribe(true, onNotify))
+    // Prefer the boot keyboard input report; it's exactly what onNotify expects.
+    if (auto *bootIn = hid->getCharacteristic(UUID_BOOT_KB_INPUT))
+        if (bootIn->canNotify() && bootIn->subscribe(true, onNotify))
             subs++;
+
+    // Fallback: some keyboards expose no boot report char even in boot mode.
+    // Subscribe to every notifiable characteristic and let onNotify filter.
+    if (subs == 0)
+        for (auto *ch : hid->getCharacteristics(true))
+            if (ch->canNotify() && ch->subscribe(true, onNotify))
+                subs++;
 
     if (subs == 0)
     {
@@ -277,6 +333,9 @@ bool blehost_is_connected() { return g_connected; }
 
 void blehost_setup()
 {
+    if (!g_keyQueue)
+        g_keyQueue = xQueueCreate(32, sizeof(BleKeyEvent));
+
     NimBLEDevice::init("katibOS");
     NimBLEDevice::setPower(3 /* dBm */);
     NimBLEDevice::setSecurityAuth(true, false, true); // bond, no MITM, SC -> Just Works
@@ -308,6 +367,14 @@ void blehost_setup()
 
 void blehost_loop()
 {
+    // Apply queued key edges here, on the main loop task, not in onNotify().
+    if (g_keyQueue)
+    {
+        BleKeyEvent ev;
+        while (xQueueReceive(g_keyQueue, &ev, 0) == pdTRUE)
+            keyboard_HID2Ascii(ev.code, ev.mod, ev.pressed);
+    }
+
     if (g_wantConnect)
     {
         g_wantConnect = false;

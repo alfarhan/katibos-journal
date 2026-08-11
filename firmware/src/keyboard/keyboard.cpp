@@ -525,6 +525,17 @@ void keyboard_HID2Ascii(uint8_t keycode, uint8_t modifier, bool pressed)
   }
 
   //////////////////////////////////////////
+  // Cmd + . (period) = MENU/back. Mac BLE keyboards (e.g. Keys-To-Go 2) have no
+  // Esc key, and their globe/media keys are vendor codes we never receive; Cmd+.
+  // is the Mac-standard "cancel", and both its keycode (0x37) and the GUI
+  // modifier (bit 3 left / bit 7 right) ride the standard boot report.
+  if (keycode == 0x37 && (modifier & 0x88))
+  {
+    display_keyboard(MENU, pressed, 69);
+    return;
+  }
+
+  //////////////////////////////////////////
   // SHIFT/ALT/CTRL state (computed early so the nav switch can branch on Shift
   // for selection-extend).
   // TU_BIT(1) - (1UL << (1))
