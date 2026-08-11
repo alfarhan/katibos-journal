@@ -323,7 +323,9 @@ void Home_keyboard(char key)
     if (key == 'U' || key == 'u') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_STORAGE; return; }
     if (key == 'T' || key == 't') { app["screen"] = KEYBOARDSCREEN; return; }
     if (key == 'H' || key == 'h') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_HELP; return; }
-    if ((key == 'S' || key == 's') && !app["config"]["sync"]["url"].as<String>().isEmpty())
+    if ((key == 'S' || key == 's') &&
+        (!app["config"]["sync"]["url"].as<String>().isEmpty() ||
+         app["config"]["sync"]["provider"].as<String>() == "git"))
     {
         app["menu"]["return"] = MENU_HOME;
         app["menu"]["state"] = MENU_SYNC;

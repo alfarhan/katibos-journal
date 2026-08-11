@@ -357,19 +357,29 @@ SyncHttp sync_http_get(const String &url)
 // HTTPClient per call (no header build-up) reuses it via setReuse(true). The
 // client is insecure (no CA bundle on-device) — transport is still TLS, we just
 // don't pin the cert, same posture the plan anticipated for api.github.com.
+// The reused TLS client persists across calls (setReuse) so back-to-back sync
+// requests skip the handshake. Its mbedTLS context holds ~40KB though, so the
+// OTA download frees it first (sync_http_close) to leave room for its own
+// secure connection.
+static WiFiClientSecure s_syncClient;
+static bool s_syncClientInit = false;
+
+void sync_http_close()
+{
+    s_syncClient.stop();
+}
+
 SyncHttp sync_http(const String &method, const String &url,
                    const std::vector<String> &headers, const String &body)
 {
-    static WiFiClientSecure client;
-    static bool clientInit = false;
-    if (!clientInit)
+    if (!s_syncClientInit)
     {
-        client.setInsecure();
-        clientInit = true;
+        s_syncClient.setInsecure();
+        s_syncClientInit = true;
     }
 
     HTTPClient http;
-    http.begin(client, url);
+    http.begin(s_syncClient, url);
     http.setReuse(true); // keep the connection open for the next call
     http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
     for (const String &h : headers)

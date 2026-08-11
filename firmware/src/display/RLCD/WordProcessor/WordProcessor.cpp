@@ -756,9 +756,19 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     if (caretRow < 0) caretRow = 0;
     if (caretRow > lastRow) caretRow = lastRow;
 
-    // Each row's baseline is measured UP from editY by the line pitch, so bottom
-    // mode at Normal spacing is pixel-identical to the previous fixed layout.
-    int caretY = editY - (lastRow - caretRow) * linePitch;
+    // Row 0's baseline (gridTop) sets where the text block sits vertically. The
+    // leftover slack (editY isn't an exact multiple of linePitch) goes to the top
+    // in bottom mode, the bottom in top mode, or splits in the middle — so the
+    // flow setting actually controls the anchor instead of always leaving a gap
+    // at the top. font_height keeps the first line a small margin below y=0.
+    int bottomTop = editY - lastRow * linePitch; // row 0 baseline, bottom-anchored
+    int gridTop = (mode == SCROLL_TOP)      ? font_height
+                  : (mode == SCROLL_MIDDLE) ? (font_height + bottomTop) / 2
+                                            : bottomTop;
+    if (gridTop > bottomTop)
+        gridTop = bottomTop; // never push the block below the bottom anchor
+
+    int caretY = gridTop + caretRow * linePitch;
     caretBaselineY = caretY; // shared with WP_render_cursor
 
     // Full repaint: draw every visible row except the caret line (drawn last).
@@ -772,7 +782,7 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             int line = topLine + r;
             if (line < 0 || line >= totalLine)
                 continue;
-            u8->setCursor(marginX, editY - (lastRow - r) * linePitch);
+            u8->setCursor(marginX, gridTop + r * linePitch);
             WP_render_line(display, u8, line);
         }
     }

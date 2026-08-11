@@ -18,6 +18,11 @@ struct SyncHttp
 // 302 → googleusercontent hop.
 SyncHttp sync_http_get(const String &url);
 
+// Drop the persistent reused TLS connection, freeing its mbedTLS heap. Device
+// only (no-op in the emulator's libcurl transport). The OTA download calls this
+// before opening its own secure client.
+void sync_http_close();
+
 // POST the raw bytes of a local file as the request body (base64 upload
 // sidecar). Follows redirects.
 SyncHttp sync_http_post_file(const String &url, const String &filePath);

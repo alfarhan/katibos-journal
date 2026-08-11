@@ -70,29 +70,16 @@ int RLCD_drawShapedLabel(U8G2_FOR_ST73XX *u8, int x, int y, const char *utf8, bo
 
 int display_RLCD_core()
 {
-  JsonDocument &app = status();
-  int screen = app["screen"].as<int>();
-
-  // if app is not ready then run in the main core
-  if (!app_ready())
-    return 0;
-
-  // IN MENU run it in the main core, so that sync process runs independently
-  if (screen == MENUSCREEN)
-  {
-    int menu = app["menu"]["state"].as<int>();
-    if (menu == MENU_SYNC)
-      return 0;
-  }
-
-  // If BLE is set then let the BLE work on background alone
-  if (app["config"]["ble"]["address"].is<const char *>())
-  {
-    return 0;
-  }
-
-  // by default run at the second core separated from keyboard loop
-  return 1;
+  // Render on core 0, the same core that runs keyboard_loop() and mutates the
+  // editor buffer. Rendering used to run on core 1 for input responsiveness,
+  // but WP_render reads shared editor state (buffer, linePositions[],
+  // lineLengths[], the measureCharWidthAt function pointer, the JsonDocument
+  // tree) with no locking. Fast typing let core 0 rewrite that state mid-render
+  // on core 1; the torn read jumped through a corrupted pointer and panicked
+  // with an illegal instruction (seen as a TG1WDT reset). Keeping edit and
+  // render on one core serializes them. Background work (app_loop: sync, word
+  // count) stays on core 1, so the offload that mattered is intact.
+  return 0;
 }
 
 //

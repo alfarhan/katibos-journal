@@ -31,7 +31,10 @@ static int buildList(int *ids)
     // Language, Time zone, Sync provider and About now live in Preferences.
     ids[n++] = ACT_PREFS;
     ids[n++] = ACT_WIFI;
-    if (!app["config"]["sync"]["url"].as<String>().isEmpty())
+    // Listed when a Drive URL is set OR the provider is git (git syncs via
+    // config.sync.git and leaves sync.url empty).
+    if (!app["config"]["sync"]["url"].as<String>().isEmpty() ||
+        app["config"]["sync"]["provider"].as<String>() == "git")
         ids[n++] = ACT_SYNC;
     ids[n++] = ACT_BLE;
     ids[n++] = ACT_DRIVE;
@@ -79,7 +82,10 @@ static void dispatch(int act)
     case ACT_TIMEZONE: app["menu"]["state"] = MENU_TIMEZONE; break;
     case ACT_WIFI: app["menu"]["state"] = MENU_WIFI; break;
     case ACT_SYNC:
-        if (!app["config"]["sync"]["url"].as<String>().isEmpty())
+        // Reachable when a Drive URL is set OR the provider is git (git syncs
+        // via config.sync.git and leaves sync.url empty).
+        if (!app["config"]["sync"]["url"].as<String>().isEmpty() ||
+            app["config"]["sync"]["provider"].as<String>() == "git")
             app["menu"]["state"] = MENU_SYNC;
         break;
     case ACT_SYNCPROV: app["menu"]["state"] = MENU_SYNCPROV; break;

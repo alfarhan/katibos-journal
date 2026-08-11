@@ -5,6 +5,7 @@
 
 #ifndef HOST_EMU
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <Update.h>
 #include "service/Sync/Sync.h"           // sync_connect_wifi
@@ -126,10 +127,46 @@ void ota_apply()
 #ifdef HOST_EMU
     setState(OTA_DONE, "Updated (simulated)");
 #else
+    // Free the persistent sync TLS connection first so mbedTLS has enough heap
+    // for this download's own secure client (two live TLS contexts starve it).
+    sync_http_close();
+    _log("[ota] free heap before download: %u\n", (unsigned)ESP.getFreeHeap());
+
+    // The bin is an https:// GitHub release URL that 302-redirects to a second
+    // HTTPS host (objects.githubusercontent.com). Following that cross-host
+    // redirect in place on a WiFiClientSecure hangs on this SoC, so we follow it
+    // manually: read Location and reconnect per hop. No CA bundle on-device, so
+    // TLS is insecure (unpinned), same posture as the sync path.
+    WiFiClientSecure client;
+    client.setInsecure();
     HTTPClient http;
-    http.begin(binUrl);
-    http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-    int code = http.GET();
+
+    String url = binUrl;
+    int code = 0;
+    for (int hop = 0; hop < 5; hop++)
+    {
+        http.begin(client, url);
+        http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+        const char *collect[] = {"Location"};
+        http.collectHeaders(collect, 1);
+        code = http.GET();
+        _log("[ota] hop %d -> HTTP %d\n", hop, code);
+        if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308)
+        {
+            String loc = http.header("Location");
+            http.end();
+            client.stop();
+            if (loc.isEmpty())
+            {
+                setState(OTA_ERROR, "Redirect without Location");
+                return;
+            }
+            url = loc;
+            continue;
+        }
+        break; // 200 (or a real error) — stop following
+    }
+
     if (code != 200)
     {
         http.end();
@@ -150,9 +187,20 @@ void ota_apply()
         return;
     }
 
+    Update.onProgress([](size_t done, size_t total) {
+        static int lastPct = -1;
+        int pct = total ? (int)(done * 100 / total) : 0;
+        if (pct != lastPct && pct % 10 == 0)
+        {
+            _log("[ota] %d%%\n", pct);
+            lastPct = pct;
+        }
+    });
+
     WiFiClient *stream = http.getStreamPtr();
     size_t written = Update.writeStream(*stream);
     http.end();
+    _log("[ota] wrote %u / %d\n", (unsigned)written, len);
 
     if (written != (size_t)len)
     {
