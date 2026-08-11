@@ -36,15 +36,8 @@ void display_setup()
     // then load the wake animation then the word processor
     //
     bool disabledWakeUp = app["config"]["wakeup_animation_disabled"].as<bool>();
-    bool usbKeyboard = app["config"]["UsbKeyboard"].as<bool>();
 
-    // Check if USB Keyboard is enabled
-    if (usbKeyboard)
-    {
-      app["screen"] = KEYBOARDSCREEN;
-    }
-
-    else if (disabledWakeUp)
+    if (disabledWakeUp)
     {
       // show the word processor immediately when wakeup is disabled
       app["screen"] = WORDPROCESSOR;

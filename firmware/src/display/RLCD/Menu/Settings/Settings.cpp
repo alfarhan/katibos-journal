@@ -13,7 +13,6 @@ enum
     ACT_WIFI,
     ACT_SYNC,
     ACT_SYNCPROV,
-    ACT_BLE,
 #ifdef USE_BLE_KEYBOARD_HOST
     ACT_BTKB,
 #endif
@@ -39,7 +38,6 @@ static int buildList(int *ids)
     if (!app["config"]["sync"]["url"].as<String>().isEmpty() ||
         app["config"]["sync"]["provider"].as<String>() == "git")
         ids[n++] = ACT_SYNC;
-    ids[n++] = ACT_BLE;
 #ifdef USE_BLE_KEYBOARD_HOST
     ids[n++] = ACT_BTKB;
 #endif
@@ -59,7 +57,6 @@ static const char *actionLabel(int act)
     case ACT_WIFI: return "Wi-Fi";
     case ACT_SYNC: return "Sync & Backup";
     case ACT_SYNCPROV: return "Sync provider";
-    case ACT_BLE: return "BLE Keyboard";
 #ifdef USE_BLE_KEYBOARD_HOST
     case ACT_BTKB: return "Connect Keyboard";
 #endif
@@ -98,7 +95,6 @@ static void dispatch(int act)
             app["menu"]["state"] = MENU_SYNC;
         break;
     case ACT_SYNCPROV: app["menu"]["state"] = MENU_SYNCPROV; break;
-    case ACT_BLE: app["screen"] = KEYBOARDSCREEN; break;
 #ifdef USE_BLE_KEYBOARD_HOST
     case ACT_BTKB: app["menu"]["state"] = MENU_BLUETOOTH; break;
 #endif
@@ -244,7 +240,6 @@ void Settings_keyboard(int key)
     if (key == 'R' || key == 'r') dispatch(ACT_PREFS);
     else if (key == 'W' || key == 'w') dispatch(ACT_WIFI);
     else if (key == 'S' || key == 's') dispatch(ACT_SYNC);
-    else if (key == 'T' || key == 't') dispatch(ACT_BLE);
 #ifdef USE_BLE_KEYBOARD_HOST
     else if (key == 'K' || key == 'k') dispatch(ACT_BTKB);
 #endif

@@ -18,7 +18,6 @@ U8G2_FOR_ST73XX u8g2;
 #include "WordProcessor/WordProcessor.h"
 #include "Menu/Menu.h"
 #include "Update/Update.h"
-#include "KeyboardScreen/KeyboardScreen.h"
 
 #include "service/Bidi/Bidi.h"
 #include <string.h>
@@ -138,17 +137,6 @@ void display_RLCD_loop()
         WP_render(&display, &u8g2);
     }
 
-    // Keyboard Screen
-    else if (screen == KEYBOARDSCREEN)
-    {
-      // setup only once
-      if (screen != screen_prev)
-        KeyboardScreen_setup(&display, &u8g2);
-      else
-        // loop
-        KeyboardScreen_render(&display, &u8g2);
-    }
-
     // MENU SCREEN
     else if (screen == MENUSCREEN)
     {
@@ -185,8 +173,6 @@ void display_RLCD_loop()
         shouldDisplay = ErrorScreen_needsDisplay();
       else if (screen == WORDPROCESSOR)
         shouldDisplay = WP_needsDisplay();
-      else if (screen == KEYBOARDSCREEN)
-        shouldDisplay = KeyboardScreen_needsDisplay();
       else if (screen == MENUSCREEN)
         shouldDisplay = Menu_needsDisplay();
       else if (screen == UPDATESCREEN)
@@ -214,12 +200,6 @@ void display_RLCD_keyboard(int key, bool pressed, int index)
   {
     // send the key stroke to word processor
     WP_keyboard(key, pressed, index);
-  }
-
-  if (screen == KEYBOARDSCREEN)
-  {
-    // send the key stroke to word processor
-    KeyboardScreen_keyboard(key, pressed, index);
   }
 
   else if (screen == MENUSCREEN)

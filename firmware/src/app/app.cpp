@@ -4,7 +4,6 @@
 
 //
 #include "service/WordCounter/WordCounter.h"
-#include "service/Send/Send.h"
 
 #ifdef SD_CS
 #include "app/FileSystem/FileSystemSD.h"
@@ -156,9 +155,6 @@ void app_loop()
 
     // word count
     wordcounter_service();
-
-    // SEND feature
-    send_loop();
 
 #ifdef USE_BLESERVER
     // Pairing with BLE Keyboard Enabled

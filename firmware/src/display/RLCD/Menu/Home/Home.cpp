@@ -321,7 +321,6 @@ void Home_keyboard(char key)
     if (key == 'L' || key == 'l') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_LAYOUT; return; }
     if (key == 'W' || key == 'w') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_WIFI; return; }
     if (key == 'U' || key == 'u') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_STORAGE; return; }
-    if (key == 'T' || key == 't') { app["screen"] = KEYBOARDSCREEN; return; }
     if (key == 'H' || key == 'h') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_HELP; return; }
     if ((key == 'S' || key == 's') &&
         (!app["config"]["sync"]["url"].as<String>().isEmpty() ||

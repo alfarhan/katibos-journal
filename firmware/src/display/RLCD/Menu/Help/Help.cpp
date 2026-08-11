@@ -163,7 +163,6 @@ void Help_keyboard(int key)
     if (key == 'L' || key == 'l') { app["menu"]["state"] = MENU_LAYOUT; return; }
     if (key == 'W' || key == 'w') { app["menu"]["state"] = MENU_WIFI; return; }
     if (key == 'U' || key == 'u') { app["menu"]["state"] = MENU_STORAGE; return; }
-    if (key == 'T' || key == 't') { app["screen"] = KEYBOARDSCREEN; return; }
     if ((key == 'S' || key == 's') && !app["config"]["sync"]["url"].as<String>().isEmpty())
     { app["menu"]["state"] = MENU_SYNC; return; }
     if (key == 'P' || key == 'p')
