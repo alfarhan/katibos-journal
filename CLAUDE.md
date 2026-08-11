@@ -31,12 +31,12 @@ Waveshare enumerates as native USB-CDC (`ARDUINO_USB_CDC_ON_BOOT`); it's BLE-LE 
 - **Renderer** (`display/RLCD/WordProcessor/`) — draws the editor. `display_RLCD_core()` returns 0 → render runs on core 0 with input (avoids a cross-core buffer race that panicked on fast typing).
 - **Input** (`keyboard/`): `keyboard.cpp` HID/dispatch; `Keypad/68/Keypad_68.cpp` has the matrix path (`#ifndef USE_SERIAL_KEYBOARD`) AND the serial path (`#ifdef USE_SERIAL_KEYBOARD`); `BLEHost/` is the BLE keyboard host; `Locale/` layout tables (`keyboard_us_equivalent` reverses a localized letter to its US base for layout-independent menu shortcuts).
 - **Editor commands** map to shared action codes (`SEL_*`, `COPY`, `SELECTALL`, …) in `display/display.h`; matrix/BLE deliver them via HID, serial via `Keypad_68.cpp` shims.
-- **Sync** (`service/Sync/`) — Drive (Apps Script) or git provider (`config.sync.git`, token on-device). **OTA** (`service/Updater/Ota.cpp`) — Wi-Fi manifest at `KATIBOS_UPDATE_URL`; the bin download follows GitHub's cross-host redirect manually with a `setInsecure()` TLS client.
+- **Sync** (`service/Sync/`) — Drive (Apps Script) or git provider (`config.sync.git`, token on-device). **OTA** (`service/Updater/Ota.cpp`) — Wi-Fi manifest at `KATIBOS_UPDATE_URL` (board-specific, set per-env in `platformio.ini`: microjournal → `latest.json`, waveshare → `latest_waveshare.json`, both in this repo); the bin download follows GitHub's cross-host redirect manually with a `setInsecure()` TLS client. Each manifest points at that board's bin on the `alfarhan/katibos` releases.
 - Design/context docs: `firmware/doc/KATIBOS.md`, `SYSTEM_OPTIONS.md`, `DEVICE_SYNC.md`.
 
 ## Notes
 
 - Version string: `firmware/src/app/app.h` (`KATIBOS_VERSION`) — bump when cutting a release.
-- Waveshare OTA is hosted separately (the `katibos-waveshare` GitHub repo serves its `latest.json`/bins); the device opts in via `config.json` `update.url`.
+- Both boards' OTA is served from this repo now (`latest.json` + `latest_waveshare.json`); the deleted `katibos-waveshare` repo is gone. A device can still override the manifest via `config.json` `update.url`; a stale `katibos-waveshare`/`micro-journal` URL is treated as dead and falls back to the built-in board default.
 - `~/projects/waveshare` was a fork that has been folded into this repo — don't recreate it.
 - Global prefs: RTL-first (logical CSS props), Arabic when writing Arabic, terse output, comments only where the *why* is non-obvious.
