@@ -24,7 +24,7 @@ void About_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     Menu_drawHeader(display, u8, "ABOUT");
 
     u8->setFont(u8g2_font_profont17_tf);
-    row(u8, 84, "MicroJournal", VERSION);
+    row(u8, 84, BOARD_NAME, VERSION);
     row(u8, 120, "katibOS", KATIBOS_VERSION);
 
     // rule, then the katibOS author credit

@@ -17,7 +17,7 @@ and trimmed to the rev_8 OS only.
 
 | | |
 | --- | --- |
-| [`firmware/`](firmware) | The rev_8 OS — PlatformIO project (ESP32-S3). Build env: **`rev_8`**. |
+| [`firmware/`](firmware) | The OS — PlatformIO project (ESP32-S3). Build envs: **`microjournal`** and **`waveshare`**. |
 | [`firmware/emulator/`](firmware/emulator) | SDL desktop emulator (build & run the OS with no hardware). |
 | [`firmware/tests/`](firmware/tests) | Host unit tests. |
 | [`firmware/doc/KATIBOS.md`](firmware/doc/KATIBOS.md) | Detailed design / feature doc. |
@@ -32,9 +32,9 @@ Hardware (enclosure STLs, build guide) lives upstream:
 ```sh
 cd firmware
 
-# Device (ESP32-S3, rev_8)
-pio run -e rev_8                 # build
-pio run -e rev_8 -t upload       # flash over USB
+# Device (ESP32-S3)
+pio run -e microjournal              # build (MicroJournal; use -e waveshare for the Waveshare board)
+pio run -e microjournal -t upload    # flash over USB
 
 # SDL emulator (desktop, no hardware)
 cd emulator && make && ./microjournal-emu
@@ -42,12 +42,12 @@ cd emulator && make && ./microjournal-emu
 
 ## Releases / OTA
 
-Firmware is published as GitHub Releases with a `firmware_rev_8.bin` asset (the name the
+Firmware is published as GitHub Releases with a `firmware_microjournal.bin` asset (the name the
 device's SD-card updater also expects). The device reads a manifest to find newer builds:
 
 1. Bump `KATIBOS_VERSION` in `app.h`.
-2. `pio run -e rev_8` → `.pio/build/rev_8/firmware.bin`.
-3. `gh release create vX.Y --target main --title "katibOS X.Y" firmware_rev_8.bin`.
+2. `pio run -e microjournal` → `.pio/build/microjournal/firmware.bin`.
+3. `gh release create vX.Y --target main --title "katibOS X.Y" firmware_microjournal.bin`.
 4. Update [`firmware/latest.json`](firmware/latest.json) (`version` + asset `url`) and push.
 
 Device `config.json` points at the raw manifest:

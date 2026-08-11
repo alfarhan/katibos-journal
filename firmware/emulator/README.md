@@ -5,7 +5,7 @@ processor, menus, Arabic bidi/shaping, locale, editor) natively on macOS in an
 SDL2 window. Only the hardware bottom layer is replaced by host shims; all UI
 and app logic is the actual firmware code under `../src` and `../lib`.
 
-Emulates the `rev_8` target: reflective mono LCD (ST7306, logical 400×300
+Emulates the `microjournal` target: reflective mono LCD (ST7306, logical 400×300
 landscape) + 68-key matrix keypad + Arabic locale + BiDi.
 
 ## Prerequisites

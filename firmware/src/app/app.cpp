@@ -69,6 +69,7 @@ void app_setup()
     Serial1.begin(115200, SERIAL_8N1, RX_PIN, TX_PIN);
 #endif
     _log("Setting Baud Rate: %d\n", 115200);
+    _log("katibOS %s on %s\n", KATIBOS_VERSION, BOARD_NAME);
 
 #if defined(BOARD_HAS_PSRAM)
     // Check if PSRAM is detected and enabled

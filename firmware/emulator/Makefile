@@ -8,14 +8,14 @@ CXXFLAGS := $(CXXSTD) -g -O0 -Wno-format -Wno-format-security -Wno-varargs -Wno-
 ROOT   := ..
 SRC    := $(ROOT)/src
 LIB    := $(ROOT)/lib/ST7305_MonoTFT_Library/src
-AJSON  := $(ROOT)/.pio/libdeps/rev_8/ArduinoJson/src
+AJSON  := $(ROOT)/.pio/libdeps/microjournal/ArduinoJson/src
 
 INCLUDES := -Ishims -I. -I$(SRC) -I$(LIB) -I$(AJSON) $(shell sdl2-config --cflags)
 
-DEFINES  := -DARDUINO=10812 -DREV8 -DKEYPAD_68 \
+DEFINES  := -DARDUINO=10812 -DREV8 -DKEYPAD_68 -DBOARD_NAME='"MicroJournal"' \
             -DPIN_SCLK=12 -DPIN_MOSI=11 -DPIN_CS=10 -DPIN_DC=46 -DPIN_RST=3 \
             -DHOST_EMU -DBUFFER_SIZE=8000 -DVERSION_AVAILABLE=0 \
-            -DFIRMWARE='"/firmware_rev_8.bin"'
+            -DFIRMWARE='"/firmware_microjournal.bin"'
 
 LDFLAGS  := $(shell sdl2-config --libs) $(shell curl-config --libs)
 

@@ -74,7 +74,7 @@ flag** (`sync_error`) rather than overwrite. (Phase 3.)
   success. A dropped WiFi mid-download must never truncate a real note.
 - Never delete a slot without the existing `*_backup.txt` mechanism.
 - Deletes propagate to **trash** (recoverable), both directions.
-- Every phase: build **both** `emulator/Makefile` and `pio run -e rev_8`
+- Every phase: build **both** `emulator/Makefile` and `pio run -e microjournal`
   (separate build systems — see CLAUDE/emulator-testing notes), prove in the
   emulator, then STOP for manual testing before the next phase.
 
@@ -85,7 +85,7 @@ host transport `emulator/host_sync_http.cpp` (libcurl), `emulator/host_real_sync
 drives it (replaces the old `host_fake_sync.cpp`). Token added to emulator
 `sdcard/config.json`. Behavior unchanged (still push-all) — this only moved the
 HTTP behind the seam so the real logic runs in the emulator. Both builds pass
-(`make`; `pio run -e rev_8`).
+(`make`; `pio run -e microjournal`).
 
 **P1 — IDs + id-targeted push — DONE (2026-06-26).** Fixes the duplicate bug.
 - `doPost` now accepts `?id=`: updates that exact file by id (setContent + rename

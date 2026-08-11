@@ -8,16 +8,18 @@ This repo builds two hardware targets from **one shared tree**. All board differ
 
 | Env | Board | Input |
 |-----|-------|-------|
-| `rev_8` (default), `rev_8_type1`, `rev_8_type2` | MicroJournal rev_8 | physical **matrix keypad** (`KEYPAD_68`) |
-| `rev_8_waveshare` | Waveshare ESP32-S3-RLCD-4.2 | **USB serial** (`USE_SERIAL_KEYBOARD`) + **BLE-HID host** (`USE_BLE_KEYBOARD_HOST`) |
+| `microjournal` (default), `microjournal_type1`, `microjournal_type2` | MicroJournal rev_8 | physical **matrix keypad** (`KEYPAD_68`) |
+| `waveshare` | Waveshare ESP32-S3-RLCD-4.2 | **USB serial** (`USE_SERIAL_KEYBOARD`) + **BLE-HID host** (`USE_BLE_KEYBOARD_HOST`) |
+
+Each env sets `BOARD_NAME` (shown at boot in serial and on the About screen).
 
 Same 400×300 ST7305/ST7306 reflective LCD on both (different pins per env). `type1/type2` set `RLCD_TYPE` for panel supplier variants.
 
 ## Build / flash (from `firmware/`)
 
 ```
-pio run -e rev_8                                        # microjournal
-pio run -e rev_8_waveshare                              # waveshare
+pio run -e microjournal                                # microjournal
+pio run -e waveshare                                   # waveshare
 pio run -e <env> -t upload --upload-port <PORT>         # flash (e.g. /dev/cu.usbmodem1101)
 pio device monitor -e <env> --port <PORT>               # 115200, exception_decoder on
 ```
