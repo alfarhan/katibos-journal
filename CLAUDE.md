@@ -1,0 +1,40 @@
+# katibOS
+
+Arabic-first (RTL) distraction-free writing firmware for ESP32-S3 e-ink/reflective-LCD typewriters. C++ / Arduino / PlatformIO. Code is in `firmware/`.
+
+## One codebase, two boards
+
+This repo builds two hardware targets from **one shared tree**. All board differences are `#ifdef`-driven — code for one board compiles (inert) on the other, so a change to shared code must keep both working.
+
+| Env | Board | Input |
+|-----|-------|-------|
+| `rev_8` (default), `rev_8_type1`, `rev_8_type2` | MicroJournal rev_8 | physical **matrix keypad** (`KEYPAD_68`) |
+| `rev_8_waveshare` | Waveshare ESP32-S3-RLCD-4.2 | **USB serial** (`USE_SERIAL_KEYBOARD`) + **BLE-HID host** (`USE_BLE_KEYBOARD_HOST`) |
+
+Same 400×300 ST7305/ST7306 reflective LCD on both (different pins per env). `type1/type2` set `RLCD_TYPE` for panel supplier variants.
+
+## Build / flash (from `firmware/`)
+
+```
+pio run -e rev_8                                        # microjournal
+pio run -e rev_8_waveshare                              # waveshare
+pio run -e <env> -t upload --upload-port <PORT>         # flash (e.g. /dev/cu.usbmodem1101)
+pio device monitor -e <env> --port <PORT>               # 115200, exception_decoder on
+```
+Waveshare enumerates as native USB-CDC (`ARDUINO_USB_CDC_ON_BOOT`); it's BLE-LE only (no Classic). Upload fails "port busy" if a monitor is open — close it first.
+
+## Where things live
+
+- **Editor core** (`service/Editor/`) — driver-agnostic; buffer, undo, selection, wrapping. Shared by all fronts, so keep changes driver-neutral.
+- **Renderer** (`display/RLCD/WordProcessor/`) — draws the editor. `display_RLCD_core()` returns 0 → render runs on core 0 with input (avoids a cross-core buffer race that panicked on fast typing).
+- **Input** (`keyboard/`): `keyboard.cpp` HID/dispatch; `Keypad/68/Keypad_68.cpp` has the matrix path (`#ifndef USE_SERIAL_KEYBOARD`) AND the serial path (`#ifdef USE_SERIAL_KEYBOARD`); `BLEHost/` is the BLE keyboard host; `Locale/` layout tables (`keyboard_us_equivalent` reverses a localized letter to its US base for layout-independent menu shortcuts).
+- **Editor commands** map to shared action codes (`SEL_*`, `COPY`, `SELECTALL`, …) in `display/display.h`; matrix/BLE deliver them via HID, serial via `Keypad_68.cpp` shims.
+- **Sync** (`service/Sync/`) — Drive (Apps Script) or git provider (`config.sync.git`, token on-device). **OTA** (`service/Updater/Ota.cpp`) — Wi-Fi manifest at `KATIBOS_UPDATE_URL`; the bin download follows GitHub's cross-host redirect manually with a `setInsecure()` TLS client.
+- Design/context docs: `firmware/doc/KATIBOS.md`, `SYSTEM_OPTIONS.md`, `DEVICE_SYNC.md`.
+
+## Notes
+
+- Version string: `firmware/src/app/app.h` (`KATIBOS_VERSION`) — bump when cutting a release.
+- Waveshare OTA is hosted separately (the `katibos-waveshare` GitHub repo serves its `latest.json`/bins); the device opts in via `config.json` `update.url`.
+- `~/projects/waveshare` was a fork that has been folded into this repo — don't recreate it.
+- Global prefs: RTL-first (logical CSS props), Arabic when writing Arabic, terse output, comments only where the *why* is non-obvious.
