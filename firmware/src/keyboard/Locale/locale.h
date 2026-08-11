@@ -11,6 +11,11 @@ int keyboard_keycode_ascii(String locale, uint8_t keycode, bool shift, bool alt,
 // defaults and the language toggle treat both variants as Arabic.
 bool keyboard_locale_is_arabic(const String &locale);
 
+// Map a locale-translated glyph back to the US-layout letter on the same
+// physical key, for layout-independent command/shortcut matching in menus.
+// ASCII and non-letter keys pass through unchanged.
+int keyboard_us_equivalent(String locale, int key);
+
 // Some layouts have keys that expand to two code points (Windows Arabic lam-alef).
 // Returns true and fills c1/c2 when (locale, keycode, shift) is such a key.
 bool keyboard_locale_ligature(const String &locale, uint8_t keycode, bool shift, int *c1, int *c2);

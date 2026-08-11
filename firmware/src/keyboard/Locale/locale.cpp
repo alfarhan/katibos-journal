@@ -73,6 +73,21 @@ int keyboard_keycode_ascii(String locale, uint8_t keycode, bool shift, bool alt,
   return keyboard_keycode_ascii_us(keycode, shift);
 }
 
+int keyboard_us_equivalent(String locale, int key)
+{
+  if (key >= 0 && key < 128)
+    return key; // already US ASCII (incl. US layout)
+  if (locale.isEmpty() || locale == "US" || locale == "null")
+    return key;
+  // Find which physical key produces this glyph under the active layout, then
+  // return the US letter on the same key. Only letters (HID A..Z) matter for
+  // command shortcuts; anything else falls through unchanged.
+  for (uint8_t hid = 0x04; hid <= 0x1d; hid++)
+    if (keyboard_keycode_ascii(locale, hid, false, false, false) == key)
+      return keyboard_keycode_ascii_us(hid, false);
+  return key;
+}
+
 bool keyboard_locale_is_arabic(const String &locale)
 {
   return locale == "AR" || locale == "ARW";

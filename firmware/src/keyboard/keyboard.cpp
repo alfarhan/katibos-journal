@@ -48,9 +48,17 @@ void Menu_clear();
 #include <BleKeyboard.h>
 #endif
 
+#ifdef USE_BLE_KEYBOARD_HOST
+#include "keyboard/BLEHost/BLEHost.h"
+#endif
+
 //
 void keyboard_setup()
 {
+#ifdef USE_BLE_KEYBOARD_HOST
+  blehost_setup();
+#endif
+
 #if defined(BOARD_PICO)
   // Register the boot-protocol HID interface at boot, not lazily when the
   // on-screen keyboard first shows, so it's present for BIOS/UEFI POST.
@@ -115,6 +123,10 @@ void keyboard_setup()
 //
 void keyboard_loop()
 {
+#ifdef USE_BLE_KEYBOARD_HOST
+  blehost_loop();
+#endif
+
 #ifdef REV7
   USBHost_loop();
 #endif

@@ -8,6 +8,7 @@
 #include <Arduino.h>
 #include <FS.h>
 #include <FFat.h>
+#include <sys/stat.h>
 
 class FileSystemFAT : public FileSystem
 {
@@ -153,7 +154,13 @@ public:
             return false;
         }
 
-        return FFat.exists(path);
+        // FFat.exists() opens the file to test it, so the VFS layer logs a noisy
+        // [E] "no permits for creation" for every miss. The Home screen probes
+        // ~100 slots on entry, flooding the serial log. stat() answers the same
+        // question without opening the file (and without the error log).
+        String full = String(_basePath) + path;
+        struct stat st;
+        return ::stat(full.c_str(), &st) == 0;
     }
 
     bool remove(const char *path) override

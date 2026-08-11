@@ -14,6 +14,9 @@ enum
     ACT_SYNC,
     ACT_SYNCPROV,
     ACT_BLE,
+#ifdef USE_BLE_KEYBOARD_HOST
+    ACT_BTKB,
+#endif
     ACT_DRIVE,
     ACT_UPDATE,
     ACT_HELP,
@@ -37,6 +40,9 @@ static int buildList(int *ids)
         app["config"]["sync"]["provider"].as<String>() == "git")
         ids[n++] = ACT_SYNC;
     ids[n++] = ACT_BLE;
+#ifdef USE_BLE_KEYBOARD_HOST
+    ids[n++] = ACT_BTKB;
+#endif
     ids[n++] = ACT_DRIVE;
     ids[n++] = ACT_UPDATE; // always available via built-in fallback URL
     ids[n++] = ACT_HELP;
@@ -54,6 +60,9 @@ static const char *actionLabel(int act)
     case ACT_SYNC: return "Sync & Backup";
     case ACT_SYNCPROV: return "Sync provider";
     case ACT_BLE: return "BLE Keyboard";
+#ifdef USE_BLE_KEYBOARD_HOST
+    case ACT_BTKB: return "Connect Keyboard";
+#endif
     case ACT_DRIVE: return "Drive Mode (USB)";
     case ACT_UPDATE: return "Check for Update";
     case ACT_HELP: return "Help";
@@ -90,6 +99,9 @@ static void dispatch(int act)
         break;
     case ACT_SYNCPROV: app["menu"]["state"] = MENU_SYNCPROV; break;
     case ACT_BLE: app["screen"] = KEYBOARDSCREEN; break;
+#ifdef USE_BLE_KEYBOARD_HOST
+    case ACT_BTKB: app["menu"]["state"] = MENU_BLUETOOTH; break;
+#endif
     case ACT_DRIVE: app["menu"]["state"] = MENU_STORAGE; break;
     case ACT_UPDATE: app["menu"]["state"] = MENU_UPDATE; break;
     case ACT_HELP: app["menu"]["state"] = MENU_HELP; break;
@@ -233,6 +245,9 @@ void Settings_keyboard(int key)
     else if (key == 'W' || key == 'w') dispatch(ACT_WIFI);
     else if (key == 'S' || key == 's') dispatch(ACT_SYNC);
     else if (key == 'T' || key == 't') dispatch(ACT_BLE);
+#ifdef USE_BLE_KEYBOARD_HOST
+    else if (key == 'K' || key == 'k') dispatch(ACT_BTKB);
+#endif
     else if (key == 'U' || key == 'u') dispatch(ACT_DRIVE);
     else if (key == 'H' || key == 'h') dispatch(ACT_HELP);
     else if (key == 'P' || key == 'p') dispatch(ACT_UPDATE);
