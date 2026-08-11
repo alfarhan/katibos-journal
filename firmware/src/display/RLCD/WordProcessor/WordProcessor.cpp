@@ -278,14 +278,17 @@ void WP_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 //
 void WP_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
-    // Apply the theme via the panel's hardware inversion. It's a sticky register
-    // (persists across all screens once set), so applying it here — the first and
-    // main screen — covers the whole UI. Only re-sent when the setting changes.
+    // Apply the theme via software framebuffer inversion. theme_dark is stored as
+    // a bool, so it MUST be read with `| false` — `| 0` fails ArduinoJson's
+    // is<int>() on a bool and always yields 0, which is why dark mode never
+    // engaged. setInvert() is sticky on the driver, so every subsequent display()
+    // — on any screen — honors it, and it works on any panel (unlike the 0x21
+    // hardware register the new-supplier panel may ignore).
     static int applied_theme = -1;
-    int wantDark = status()["config"]["theme_dark"] | 0;
+    int wantDark = (status()["config"]["theme_dark"] | false) ? 1 : 0;
     if (wantDark != applied_theme)
     {
-        display->display_Inversion(wantDark != 0);
+        display->setInvert(wantDark != 0);
         applied_theme = wantDark;
     }
 

@@ -44,6 +44,11 @@ public:
     void display_on(bool enabled);
     void display_Inversion(bool enabled);
 
+    // Software theme inversion (white-on-black). Unlike display_Inversion()'s
+    // 0x21/0x20 register — which the new-supplier panel ignores — this XORs the
+    // framebuffer at send time, so it works on every panel/board.
+    void setInvert(bool enabled);
+
 private:
     const int DC_PIN;
     const int RES_PIN;
@@ -56,6 +61,8 @@ private:
     const int LCD_DATA_HEIGHT;
     const int DISPLAY_BUFFER_LENGTH;
     uint8_t *display_buffer;
+    bool m_invert = false;
+    uint8_t *invert_buffer = nullptr; // XOR scratch, allocated on first dark use
     SPIClass &spiRef;
 
     void address();

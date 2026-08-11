@@ -46,6 +46,7 @@ ST7305_4p2_BW_DisplayDriver::ST7305_4p2_BW_DisplayDriver(
 ST7305_4p2_BW_DisplayDriver::~ST7305_4p2_BW_DisplayDriver()
 {
     delete[] display_buffer;
+    delete[] invert_buffer;
 }
 
 void ST7305_4p2_BW_DisplayDriver::initialize()
@@ -162,8 +163,30 @@ void ST7305_4p2_BW_DisplayDriver::display()
     address();
     digitalWrite(DC_PIN, HIGH);
     digitalWrite(CS_PIN, LOW);
-    spiRef.writeBytes(display_buffer, DISPLAY_BUFFER_LENGTH);
+
+    // Dark theme: send an inverted copy. XOR 0xFF flips every pixel for both
+    // packings (type-1 full 0x0/0xF nibbles, type-2 1bpp). Sent from a scratch
+    // buffer so the source framebuffer stays intact for the next partial draw.
+    uint8_t *out = display_buffer;
+    if (m_invert)
+    {
+        if (!invert_buffer)
+            invert_buffer = new uint8_t[DISPLAY_BUFFER_LENGTH];
+        if (invert_buffer)
+        {
+            for (int i = 0; i < DISPLAY_BUFFER_LENGTH; i++)
+                invert_buffer[i] = display_buffer[i] ^ 0xFF;
+            out = invert_buffer;
+        }
+    }
+
+    spiRef.writeBytes(out, DISPLAY_BUFFER_LENGTH);
     digitalWrite(CS_PIN, HIGH);
+}
+
+void ST7305_4p2_BW_DisplayDriver::setInvert(bool enabled)
+{
+    m_invert = enabled;
 }
 
 void ST7305_4p2_BW_DisplayDriver::Initial_ST7305()
