@@ -128,8 +128,10 @@ void Ota_keyboard(int key)
         if (st == OTA_AVAILABLE)
         {
             app["ota_state"] = OTA_DOWNLOADING;
-            app["ota_progress"] = 0;
-            app["ota_message"] = "Installing... 0%";
+            // No percentage until bytes actually flow: the TLS handshake and the
+            // GitHub redirect take ~5s, and a "0%" sitting there reads as stuck.
+            app["ota_progress"] = -1;
+            app["ota_message"] = "Connecting...";
             app["clear"] = true;
             pending = 2;
             settle = 1;

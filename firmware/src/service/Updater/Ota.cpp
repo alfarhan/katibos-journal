@@ -129,7 +129,8 @@ void ota_apply()
         return;
     }
 
-    setState(OTA_DOWNLOADING, "Downloading firmware...");
+    app["ota_progress"] = -1; // percentage appears with the first chunk
+    setState(OTA_DOWNLOADING, "Connecting...");
 
 #ifdef HOST_EMU
     // Step the same progress path the device uses, so the screen can be
