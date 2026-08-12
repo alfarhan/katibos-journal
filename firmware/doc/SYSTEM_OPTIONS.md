@@ -8,9 +8,15 @@ just opens another screen). A real preferences screen would hold device
 Tags: **[wired]** = config field already exists, just needs a control ·
 **[new]** = new logic · **★** = especially fitting for an Arabic writing device.
 
+> **Stale sections below.** The clock/date, daily-goal, wake-up-animation and
+> device-name features were **removed** from the firmware (034dc3f), so those
+> items are no longer "[wired]" — building them means writing them from scratch.
+> A Preferences screen now exists (`Menu/Preferences/`) with theme, line spacing,
+> text flow and status bar.
+
 ## Writing & editor
 - Font size S/M/L — **[wired: `editor_font_size`]**
-- Status bar shown by default (Ctrl+H is per-session today)
+- ~~Status bar shown by default~~ — **built**: Preferences → Status bar, and Ctrl+H writes the same `statusbar_hidden` key (one setting, persisted)
 - Focus / typewriter mode (keep the caret line centered)
 - Line spacing
 - Boot to last doc vs. the file list
