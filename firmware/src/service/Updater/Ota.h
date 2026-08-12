@@ -32,3 +32,8 @@ void ota_check();
 void ota_apply();
 // Reboot into the freshly written slot (device only; no-op in the emulator).
 void ota_reboot();
+
+// ota_apply() blocks the render loop for the whole download, so the screen can't
+// repaint itself while it runs. The active screen registers a redraw here; the
+// download calls it as the percentage advances (ota_message carries the text).
+void ota_set_redraw(void (*cb)());

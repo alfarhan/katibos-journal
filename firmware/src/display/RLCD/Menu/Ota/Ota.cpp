@@ -21,7 +21,12 @@ void Ota_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     settle = 1;
 }
 
-void Ota_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
+// Panel + font handles kept for the download's progress repaints, which happen
+// inside ota_apply() rather than on a render tick.
+static ST7305_4p2_BW_DisplayDriver *g_display = nullptr;
+static U8G2_FOR_ST73XX *g_u8 = nullptr;
+
+static void drawScreen(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
     JsonDocument &app = status();
     int st = app["ota_state"] | OTA_IDLE;
@@ -54,6 +59,37 @@ void Ota_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     int hw = u8->getUTF8Width(hint);
     u8->setCursor((400 - hw) / 2, 296);
     u8->print(hint);
+
+    // progress bar, drawn only while a download is running
+    int pct = app["ota_progress"] | -1;
+    if (st == OTA_DOWNLOADING && pct >= 0)
+    {
+        const int bx = 60, by = 180, bw = 280, bh = 18;
+        display->drawRectangle(bx, by, bx + bw, by + bh, 1);
+        int fill = (bw - 4) * pct / 100;
+        if (fill > 0)
+            display->drawFilledRectangle(bx + 2, by + 2, bx + 2 + fill, by + bh - 2, 1);
+    }
+}
+
+// Repaint from inside the blocking download: nothing else draws while
+// ota_apply() holds the render task, so going straight to the panel is safe.
+static void redrawDuringDownload()
+{
+    if (!g_display || !g_u8)
+        return;
+    g_display->clearDisplay();
+    drawScreen(g_display, g_u8);
+    g_display->display();
+}
+
+void Ota_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
+{
+    g_display = display;
+    g_u8 = u8;
+    ota_set_redraw(redrawDuringDownload);
+
+    drawScreen(display, u8);
 
     // deferred blocking work (one frame after the message is shown)
     if (pending && settle > 0)
@@ -92,7 +128,8 @@ void Ota_keyboard(int key)
         if (st == OTA_AVAILABLE)
         {
             app["ota_state"] = OTA_DOWNLOADING;
-            app["ota_message"] = "Downloading firmware... (may take a minute)";
+            app["ota_progress"] = 0;
+            app["ota_message"] = "Installing... 0%";
             app["clear"] = true;
             pending = 2;
             settle = 1;

@@ -12,6 +12,13 @@
 #include "service/WifiEntry/WifiEntry.h" // wifi_config_load
 #endif
 
+static void (*g_redraw)() = nullptr;
+
+void ota_set_redraw(void (*cb)())
+{
+    g_redraw = cb;
+}
+
 static void setState(int s, const String &msg)
 {
     JsonDocument &app = status();
@@ -125,6 +132,21 @@ void ota_apply()
     setState(OTA_DOWNLOADING, "Downloading firmware...");
 
 #ifdef HOST_EMU
+    // Step the same progress path the device uses, so the screen can be
+    // previewed headlessly. EMU_OTA_STALL=<pct> holds there instead of finishing.
+    {
+        const char *s = getenv("EMU_OTA_STALL");
+        int stall = s ? atoi(s) : -1;
+        for (int p = 0; p <= 100; p += 5)
+        {
+            app["ota_progress"] = p;
+            app["ota_message"] = format("Installing... %d%%", p);
+            if (g_redraw)
+                g_redraw();
+            if (stall >= 0 && p >= stall)
+                return;
+        }
+    }
     setState(OTA_DONE, "Updated (simulated)");
 #else
     // Free the persistent sync TLS connection first so mbedTLS has enough heap
@@ -187,14 +209,21 @@ void ota_apply()
         return;
     }
 
+    // Repaint on every 5%: a push is the whole 30KB frame over SPI, so a finer
+    // step would spend more time drawing than downloading.
     Update.onProgress([](size_t done, size_t total) {
         static int lastPct = -1;
         int pct = total ? (int)(done * 100 / total) : 0;
-        if (pct != lastPct && pct % 10 == 0)
-        {
+        if (pct == lastPct || pct % 5)
+            return;
+        lastPct = pct;
+        if (pct % 10 == 0)
             _log("[ota] %d%%\n", pct);
-            lastPct = pct;
-        }
+        JsonDocument &app = status();
+        app["ota_progress"] = pct;
+        app["ota_message"] = format("Installing... %d%%", pct);
+        if (g_redraw)
+            g_redraw();
     });
 
     WiFiClient *stream = http.getStreamPtr();
