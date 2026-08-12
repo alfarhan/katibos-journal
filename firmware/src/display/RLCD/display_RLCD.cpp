@@ -26,7 +26,7 @@ U8G2_FOR_ST73XX u8g2;
 // monospace profont17; Arabic from the connected-forms Arabic font - same pair
 // idea as the word processor, so Arabic shapes and joins correctly outside it.
 #define LBL_FONT u8g2_font_profont17_tf
-#define LBL_FONT_ARABIC wp_arabic_font()
+#define LBL_FONT_ARABIC u8g2_font_10x20_t_arabic
 
 int RLCD_drawShapedLabel(U8G2_FOR_ST73XX *u8, int x, int y, const char *utf8, bool baseHintRTL)
 {

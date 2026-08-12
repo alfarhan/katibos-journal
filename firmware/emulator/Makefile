@@ -15,7 +15,7 @@ INCLUDES := -Ishims -I. -I$(SRC) -I$(LIB) -I$(AJSON) $(shell sdl2-config --cflag
 DEFINES  := -DARDUINO=10812 -DREV8 -DKEYPAD_68 -DBOARD_NAME='"MicroJournal"' \
             -DPIN_SCLK=12 -DPIN_MOSI=11 -DPIN_CS=10 -DPIN_DC=46 -DPIN_RST=3 \
             -DHOST_EMU -DBUFFER_SIZE=8000 -DVERSION_AVAILABLE=0 \
-            -DFIRMWARE='"/firmware_microjournal.bin"'
+            -DFIRMWARE='"/firmware_microjournal.bin"' $(EXTRA_DEFINES)
 
 LDFLAGS  := $(shell sdl2-config --libs) $(shell curl-config --libs)
 
@@ -49,6 +49,7 @@ FW_CPP := \
   $(SRC)/display/RLCD/Menu/Bluetooth/Bluetooth.cpp \
   $(SRC)/keyboard/BLEHost/BLEHost.cpp \
   $(SRC)/service/WifiEntry/WifiEntry.cpp \
+  $(SRC)/service/Battery/Battery.cpp \
   $(SRC)/display/RLCD/ErrorScreen/ErrorScreen.cpp \
   $(SRC)/display/RLCD/Update/Update.cpp \
   $(SRC)/keyboard/keyboard.cpp \

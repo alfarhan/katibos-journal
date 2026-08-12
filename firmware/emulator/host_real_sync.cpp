@@ -11,7 +11,6 @@
 #include "service/Sync/Sync.h"
 #include "service/Sync/SyncCore.h"
 #include "service/Tools/Tools.h"
-#include "service/Clock/Clock.h"
 #include <ctime>
 
 static bool g_running = false;
@@ -99,9 +98,6 @@ void sync_loop()
         app["sync_state"] = SYNC_STARTED;
         app["sync_message"] = "Syncing...";
         app["clear"] = true;
-        // Mirror the device: it learns the real time on connect (NTP / Date
-        // header). The Mac is already online, so use its wall clock.
-        clock_set_epoch((long)time(nullptr));
         if (app["sync_scope"].as<String>() == "one")
             sync_begin_one(app, url, app["sync_one"].as<int>());
         else

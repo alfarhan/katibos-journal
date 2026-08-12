@@ -417,9 +417,6 @@ extern const uint8_t u8g2_font_10x20_me[] U8G2_FONT_SECTION("u8g2_font_10x20_me"
 extern const uint8_t u8g2_font_10x20_t_greek[] U8G2_FONT_SECTION("u8g2_font_10x20_t_greek");
 extern const uint8_t u8g2_font_10x20_t_cyrillic[] U8G2_FONT_SECTION("u8g2_font_10x20_t_cyrillic");
 extern const uint8_t u8g2_font_10x20_t_arabic[] U8G2_FONT_SECTION("u8g2_font_10x20_t_arabic");
-extern const uint8_t u8g2_font_ibmplex_arabic_s[] U8G2_FONT_SECTION("u8g2_font_ibmplex_arabic_s");
-extern const uint8_t u8g2_font_ibmplex_arabic_m[] U8G2_FONT_SECTION("u8g2_font_ibmplex_arabic_m");
-extern const uint8_t u8g2_font_ibmplex_arabic_l[] U8G2_FONT_SECTION("u8g2_font_ibmplex_arabic_l");
 extern const uint8_t u8g2_font_siji_t_6x10[] U8G2_FONT_SECTION("u8g2_font_siji_t_6x10");
 extern const uint8_t u8g2_font_tom_thumb_4x6_t_all[] U8G2_FONT_SECTION("u8g2_font_tom_thumb_4x6_t_all");
 extern const uint8_t u8g2_font_tom_thumb_4x6_tf[] U8G2_FONT_SECTION("u8g2_font_tom_thumb_4x6_tf");

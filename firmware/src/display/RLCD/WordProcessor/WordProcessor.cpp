@@ -11,6 +11,7 @@
 #include "service/Bidi/Bidi.h"
 #include "service/Tools/TextUtil.h"
 #include "service/Sync/Sync.h"
+#include "service/Battery/Battery.h"
 #include "app/Config/Config.h"
 #include "display/RLCD/Menu/Help/Help.h"
 #include "display/RLCD/Menu/Menu.h"
@@ -18,37 +19,7 @@
 
 // Arabic glyphs are drawn from a font that carries the connected presentation
 // forms; Latin/ASCII keeps the existing ProFont. The Arabic face + size are
-// runtime-selectable (Preferences): config.arabic_font 0 = Default (10x20),
-// 1 = IBM Plex Bold; config.arabic_size 0/1/2 = Small/Normal/Large (IBM only).
-const uint8_t *wp_arabic_font()
-{
-    JsonDocument &app = status();
-    if ((app["config"]["arabic_font"] | 1) == 0)
-        return u8g2_font_10x20_t_arabic;
-    switch (app["config"]["arabic_size"] | 1)
-    {
-    case 0: return u8g2_font_ibmplex_arabic_s;
-    case 2: return u8g2_font_ibmplex_arabic_l;
-    default: return u8g2_font_ibmplex_arabic_m;
-    }
-}
-
-// Extra baseline-to-baseline pitch for the taller IBM sizes, so lines don't
-// overlap (Large) or waste space (Small). Default face keeps its ~20px pitch.
-static int wp_arabic_pitch_extra()
-{
-    JsonDocument &app = status();
-    if ((app["config"]["arabic_font"] | 1) == 0)
-        return 0;
-    switch (app["config"]["arabic_size"] | 1)
-    {
-    case 0: return -2; // Small
-    case 2: return 6;  // Large
-    default: return 0; // Normal
-    }
-}
-
-#define WP_FONT_ARABIC wp_arabic_font()
+#define WP_FONT_ARABIC u8g2_font_10x20_t_arabic
 
 //
 int STATUSBAR_Y = 295;
@@ -112,13 +83,12 @@ int editY = cursorY - 6;
 // fit more lines - fine for unvocalized Arabic, but harakat/tashkīl can touch.
 static int linePitchFor(int spacing)
 {
-    int extra = wp_arabic_pitch_extra();
     switch (spacing)
     {
-    case 1: return 26 + extra;           // Relaxed
-    case 2: return 30 + extra;           // Spacious
-    case 3: return 20 + extra;           // Compact
-    default: return font_height + extra; // Normal (22)
+    case 1: return 26;           // Relaxed
+    case 2: return 30;           // Spacious
+    case 3: return 20;           // Compact
+    default: return font_height; // Normal (22)
     }
 }
 
@@ -277,7 +247,7 @@ void WP_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     // setup default color
     JsonDocument &app = status();
 
-    // restore the persistent status-bar default (Ctrl+H still toggles per session)
+    // restore the status-bar setting (Ctrl+H writes the same config key)
     statusbar_hidden = app["config"]["statusbar_hidden"] | false;
 
     // restore the line spacing + status-bar layout (sets rows-per-screen and the
@@ -966,6 +936,11 @@ void WP_render_status(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
     String right = savedTok + " | " + formatNumber(wordCount) + " words | " + locLabel;
 
+    // battery last, flush to the edge; -1 on boards with no sense line
+    int batt = battery_percent();
+    if (batt >= 0)
+        right += " | " + String(batt) + "%";
+
     // While a background sync (Ctrl+U) is running, the right group shows its
     // progress instead; a finished/failed sync lingers ~3s then reverts.
     static unsigned int sync_clear_at = 0;
@@ -1205,6 +1180,9 @@ void WP_keyboard(int key, bool pressed, int index)
     if (key == STATUSBAR)
     {
         statusbar_hidden = !statusbar_hidden;
+        // persist, so the toggle and the Preferences row are the same setting
+        status()["config"]["statusbar_hidden"] = statusbar_hidden;
+        config_save();
         applyStatusbarLayout(); // reclaim/release the bar's band for text
         Editor::getInstance().pageChanged = true; // full clear+redraw for the new layout
         return;

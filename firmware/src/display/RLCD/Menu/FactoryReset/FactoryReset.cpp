@@ -70,7 +70,7 @@ static void wipe(JsonDocument &app)
 
     // preferences → remove so each falls back to its default
     const char *prefs[] = {"theme_dark", "line_spacing", "scroll_mode", "text_align",
-                           "statusbar_hidden", "arabic_font", "arabic_size"};
+                           "statusbar_hidden"};
     for (auto k : prefs)
         app["config"].remove(k);
 

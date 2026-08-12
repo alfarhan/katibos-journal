@@ -5,7 +5,9 @@
 #include "app/app.h"
 #include "display/display.h"
 #include "host_fs.h"
-#include "service/Clock/Clock.h"
+#ifdef BATTERY
+#include "service/Battery/Battery.h"
+#endif
 #include <cstdlib>
 #include <cstring>
 
@@ -45,12 +47,9 @@ void app_setup()
     app["config"]["wakeup_animation_disabled"] = true; // skip wake animation
     app["config"]["UsbKeyboard"] = false;              // not the BLE keyboard screen
 
-    // EMU_EPOCH: confirm the software clock at a fixed UTC epoch (seconds) so
-    // headless dumps can exercise clock-gated UI (date/time header, last-synced
-    // ages) without a real NTP/sync round-trip. Emulator-only.
-    const char *envEpoch = getenv("EMU_EPOCH");
-    if (envEpoch && *envEpoch)
-        clock_set_epoch(atol(envEpoch));
+#ifdef BATTERY
+    battery_setup();
+#endif
 
     // start on the word processor
     app["screen"] = WORDPROCESSOR;

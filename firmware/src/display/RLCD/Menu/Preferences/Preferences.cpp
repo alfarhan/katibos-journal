@@ -15,8 +15,6 @@ enum
     R_SPACE,
     R_FLOW,
     R_STATUS,
-    R_FONT,
-    R_FONTSIZE,
     R_LAYOUT,
     R_PROV,
     R_FACTORY,
@@ -36,8 +34,6 @@ static const PRow ROWS[] = {
     {R_SPACE, "Line spacing"},
     {R_FLOW, "Text flow"},
     {R_STATUS, "Status bar"},
-    {R_FONT, "Arabic font"},
-    {R_FONTSIZE, "Arabic size"},
     {R_HEAD, "INPUT"},
     {R_LAYOUT, "Keyboard layout"},
     {R_HEAD, "SYNC"},
@@ -73,15 +69,6 @@ static String valueStr(JsonDocument &app, int type)
         return FLOW_LBL[(app["config"]["scroll_mode"] | 2) % 3];
     case R_STATUS:
         return app["config"]["statusbar_hidden"].as<bool>() ? "Hidden" : "Shown";
-    case R_FONT:
-        return (app["config"]["arabic_font"] | 1) == 0 ? "Default" : "IBM Bold";
-    case R_FONTSIZE:
-    {
-        if ((app["config"]["arabic_font"] | 1) == 0)
-            return "-"; // size only applies to the IBM face
-        static const char *SZ[] = {"Small", "Normal", "Large"};
-        return SZ[(app["config"]["arabic_size"] | 1) % 3];
-    }
     case R_LAYOUT:
     {
         String l = app["config"]["keyboard_layout"].as<String>();
@@ -109,12 +96,6 @@ static void cycle(JsonDocument &app, int type, int dir)
         break;
     case R_STATUS:
         app["config"]["statusbar_hidden"] = !app["config"]["statusbar_hidden"].as<bool>();
-        break;
-    case R_FONT:
-        app["config"]["arabic_font"] = ((app["config"]["arabic_font"] | 1) + 1) % 2;
-        break;
-    case R_FONTSIZE:
-        app["config"]["arabic_size"] = (((app["config"]["arabic_size"] | 1) + (dir > 0 ? 1 : 2)) % 3);
         break;
     default:
         return;
