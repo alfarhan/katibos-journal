@@ -2,6 +2,7 @@
 #include "../Menu.h"
 #include "app/app.h"
 #include "display/display.h"
+#include "display/RLCD/display_RLCD.h"
 #include "display/RLCD/Menu/FileList/Pagination.h"
 
 // One consolidated Preferences screen: behavior toggles/values grouped by
@@ -123,12 +124,15 @@ static void drawChevron(ST7305_4p2_BW_DisplayDriver *display, int xr, int yc, ui
 }
 
 // rows between the header divider and the footer. Section headers get a little
-// extra height (HEAD_GAP) as breathing space ABOVE the title.
-static const int TOP = 34, FOOT = 276, ITEM_H = 18, HEAD_GAP = 8;
+// extra height (HEAD_GAP) as breathing space ABOVE the rule.
+static const int TOP = 34, FOOT = 292, ITEM_H = 25, HEAD_GAP = 8;
 
 static int rowHeight(int i)
 {
-    return (ROWS[i].type == R_HEAD && i > 0) ? ITEM_H + HEAD_GAP : ITEM_H;
+    if (ROWS[i].type != R_HEAD)
+        return ITEM_H;
+    // a section is just a rule now, so it needs the gap around it, not a text line
+    return i > 0 ? HEAD_GAP * 2 : HEAD_GAP;
 }
 
 // highest row index fully visible when the window starts at `top`
@@ -183,19 +187,16 @@ void Preferences_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u
 
         if (row.type == R_HEAD)
         {
-            // text sits in the lower part of the cell; the extra HEAD_GAP above
-            // it separates this section from the previous group's last item.
-            int base = y + (h - ITEM_H) + 14;
-            u8->setForegroundColor(ST7305_COLOR_BLACK);
-            u8->setBackgroundColor(ST7305_COLOR_WHITE);
-            u8->setCursor(8, base);
-            u8->print(row.label);
-            display->drawLine(8, y + h - 2, xr, y + h - 2, 1);
+            // a section reads as a rule between groups; the names (EDITOR, INPUT,
+            // ...) said nothing the grouping didn't already show. The first
+            // section needs no rule - the header divider already sits above it.
+            if (i > 0)
+                display->drawLine(8, y + h / 2, xr, y + h / 2, 1);
             y += h;
             continue;
         }
 
-        int base = y + 14, yc = y + 9;
+        int base = y + 18, yc = y + 12;
         bool focused = (i == g_cursor);
         if (focused)
         {
@@ -233,10 +234,6 @@ void Preferences_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u
         y += h;
     }
 
-    display->drawLine(0, FOOT, 400, FOOT, 1);
-    u8->setFont(u8g2_font_profont17_tf);
-    u8->setCursor(6, 296);
-    u8->print("[UP/DN] move  [<>] change  [ENT] open  [Esc] back");
 }
 
 void Preferences_keyboard(int key)

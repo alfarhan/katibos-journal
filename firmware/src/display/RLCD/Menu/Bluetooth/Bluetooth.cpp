@@ -46,17 +46,10 @@ void Bluetooth_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     int cursor = paginate::clampInt(g_cursor, 0, count > 0 ? count - 1 : 0);
     int page = paginate::pageOf(cursor, BT_PER_PAGE);
     int rows = paginate::rowsOnPage(page, BT_PER_PAGE, count);
-    int pages = paginate::pageCount(count, BT_PER_PAGE);
 
     u8->setCursor(10, 74);
     u8->print("FOUND KEYBOARDS:");
-    if (pages > 1)
-    {
-        char pg[12];
-        snprintf(pg, sizeof(pg), "p%d/%d", page + 1, pages);
-        u8->setCursor(392 - u8->getUTF8Width(pg), 74);
-        u8->print(pg);
-    }
+    RLCD_drawScrollbar(display, 384, 84, 286, page * BT_PER_PAGE, BT_PER_PAGE, count);
 
     if (count == 0)
     {
@@ -72,7 +65,7 @@ void Bluetooth_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
         if (focused)
         {
-            display->drawFilledRectangle(8, y - 15, 392, y + 4, 1);
+            display->drawFilledRectangle(8, y - 15, 378, y + 4, 1);
             u8->setForegroundColor(ST7305_COLOR_WHITE);
             u8->setBackgroundColor(ST7305_COLOR_BLACK);
         }
@@ -90,9 +83,7 @@ void Bluetooth_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         }
     }
 
-    display->drawLine(0, 276, 400, 276, 1);
-    u8->setCursor(6, 296);
-    u8->print("[Enter] connect  [R] scan  [F] forget  [B] back");
+
 }
 
 void Bluetooth_keyboard(int key)

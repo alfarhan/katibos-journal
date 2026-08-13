@@ -2,6 +2,7 @@
 #include "../Menu.h"
 #include "app/app.h"
 #include "display/display.h"
+#include "display/RLCD/display_RLCD.h"
 #include "display/RLCD/Menu/FileList/Pagination.h"
 #include "../../WordProcessor/WordProcessor.h"
 
@@ -76,7 +77,9 @@ void Layout_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     Menu_drawHeader(display, u8, "LANGUAGE");
 
     int active = currentRow();
-    const int pitch = 19;
+    // no footer here - the list fills the screen instead, so the rows get the
+    // extra pitch rather than leaving the last one squeezed against a divider
+    const int pitch = 20;
     const int xr = 384;
 
     u8->setFont(u8g2_font_profont17_tf);
@@ -105,18 +108,16 @@ void Layout_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         }
     }
 
-    display->drawLine(0, 276, 400, 276, 1);
-    u8->setCursor(8, 296);
-    u8->print("[UP/DN] move  [ENT] select  [<-] back");
 }
 
 void Layout_keyboard(char key)
 {
     JsonDocument &app = status();
 
-    // Back to Settings without changing the layout (Esc / Left / B). Handled
-    // first so these keys never fall through and reset the layout.
-    if (key == 27 || key == MENU || key == 18 || key == 'B' || key == 'b')
+    // Back to Settings without changing the layout (Esc / Left). Handled first
+    // so these keys never fall through and reset the layout. B is deliberately
+    // NOT a back key here - it belongs to [B] Belgian in the list below.
+    if (key == 27 || key == MENU || key == 18)
     {
         app["menu"]["state"] = app["menu"]["return"] | MENU_SETTINGS;
         return;

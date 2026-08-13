@@ -92,10 +92,6 @@ static int linePitchFor(int spacing)
     }
 }
 
-// Line-spacing codes ordered tight -> loose for the options cycle, so Left/Right
-// step through them naturally (the stored code keeps Normal=0 as the safe default).
-static const int spacingCycle[] = {3, 0, 1, 2}; // Compact, Normal, Relaxed, Spacious
-
 // Apply line spacing to the editor's row count — the single source of truth for
 // lines-per-screen, also used by Page Up/Down. Called at setup and whenever the
 // spacing changes in the options panel.
@@ -497,9 +493,6 @@ void WP_render_clear(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     }
 
     //
-    JsonDocument &app = status();
-
-    //
     static int cursorLine_prev = 0;
     static int cursorPos_prev = 0;
     int cursorLine = Editor::getInstance().cursorLine;
@@ -734,10 +727,7 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     u8->setFont(WP_FONT);
 
     // Cursor Information
-    static int cursorLine_prev = 0;
-    static int cursorLinePos_prev = 0;
     int cursorLine = Editor::getInstance().cursorLine;
-    int cursorLinePos = Editor::getInstance().cursorLinePos;
     int totalLine = Editor::getInstance().totalLine;
 
     // Scroll mode decides where the active line sits and which file line is at
@@ -811,11 +801,33 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 }
 
 
+// Status bar layout: fixed columns rather than one packed right-aligned group,
+// so each field keeps its place as its value changes width.
+//   TITLE           1,204 WORDS      AR              SAVED  87%
+static const int SB_COL_TITLE = 5;
+static const int SB_COL_WORDS = 100;
+static const int SB_COL_LOCALE = 215;
+static const int SB_EDGE_RIGHT = 395;
+static const int SB_FLASH_X = 185; // left edge of the inverted transient band
+
+// ASCII-only uppercase: bytes >= 0x80 are UTF-8 continuation/lead bytes and must
+// pass through untouched, so an Arabic title survives.
+static String sbUpper(const String &s)
+{
+    String out;
+    for (unsigned int i = 0; i < s.length(); i++)
+    {
+        char c = s[i];
+        out += (c >= 'a' && c <= 'z') ? (char)(c - 32) : c;
+    }
+    return out;
+}
+
 // Status Bar
-// - file index
-// - current file size
+// - note title
+// - word count
 // - keyboard layout
-// - saved status
+// - saved status / battery
 void WP_render_status(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
     JsonDocument &app = status();
@@ -842,7 +854,7 @@ void WP_render_status(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         {
             sync_toast_until = 0; // still running
             String msg = app["sync_message"].as<String>();
-            toast = msg.isEmpty() ? String("syncing...") : capUtf8(msg, 30);
+            toast = msg.isEmpty() ? String("SYNCING...") : capUtf8(msg, 30);
         }
         else if (sync_state == SYNC_COMPLETED || sync_state == SYNC_ERROR)
         {
@@ -853,19 +865,19 @@ void WP_render_status(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
                 if (sync_state == SYNC_ERROR)
                 {
                     String err = app["sync_error"].as<String>(); err.trim();
-                    toast = err.isEmpty() ? String("sync failed") : capUtf8(err, 30);
+                    toast = err.isEmpty() ? String("SYNC FAILED") : capUtf8(err, 30);
                 }
                 else
                 {
                     String msg = app["sync_message"].as<String>(); msg.trim();
-                    toast = msg.isEmpty() ? String("synced") : capUtf8(msg, 30);
+                    toast = msg.isEmpty() ? String("SYNCED") : capUtf8(msg, 30);
                 }
             }
         }
 
         // no sync notification active -> fall back to the save flash
         if (toast.isEmpty() && millis() < saved_flash_until)
-            toast = "saved";
+            toast = "SAVED";
 
         static int prevBoxW = 0;
         if (!toast.isEmpty())
@@ -883,7 +895,7 @@ void WP_render_status(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             u8->setForegroundColor(ST7305_COLOR_WHITE);
             u8->setBackgroundColor(ST7305_COLOR_BLACK);
             u8->setCursor(pad, 18);
-            u8->print(toast.c_str());
+            u8->print(sbUpper(toast).c_str());
             u8->setForegroundColor(ST7305_COLOR_BLACK);
             u8->setBackgroundColor(ST7305_COLOR_WHITE);
             prevBoxW = boxW;
@@ -906,50 +918,63 @@ void WP_render_status(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     // STATUS BAR
     display->drawLine(0, STATUSBAR_Y - 16, screen_width, STATUSBAR_Y - 16, 1);
 
-    // FILE INDEX + TITLE
+    // TITLE
     u8->setFont(u8g2_font_profont17_tf);
-    u8->setCursor(5, STATUSBAR_Y);
+    u8->setCursor(SB_COL_TITLE, STATUSBAR_Y);
     {
         int fi = app["config"]["file_index"].as<int>();
         String title = app["config"][format("title_%d", fi)].as<String>();
         if (title.isEmpty() || title == "null")
         {
-            u8->printf("untitled");
+            u8->print("UNTITLED");
         }
         else
         {
             // title only (no file index); shaping helper so a (possibly Arabic)
             // title isn't blank in the Latin-only status font.
-            RLCD_drawShapedLabel(u8, u8->getCursorX(), STATUSBAR_Y, capUtf8(title, 9).c_str(), false);
+            RLCD_drawShapedLabel(u8, SB_COL_TITLE, STATUSBAR_Y,
+                                 sbUpper(capUtf8(title, 9)).c_str(), false);
         }
     }
 
-    // STATUS GROUP: one contiguous "saved | xx words | ar" string, right-aligned
-    // flush to the edge (file name stays on the left). The save token is a fixed
-    // 5 wide so toggling saved<->dots never changes the width. All-Latin, LTR.
-    String locale = app["config"]["keyboard_layout"].as<String>();
-    String locLabel = (locale.isEmpty() || locale == "null" || locale == "US") ? "en" : locale;
-    locLabel.toLowerCase();
-
-    String savedTok = Editor::getInstance().saved ? "saved" : " ...."; // 4 dots, 5 wide
+    // WORD COUNT - fixed column, so it never shifts when the title changes width
     int wordCount = Editor::getInstance().wordCountFile + Editor::getInstance().wordCountBuffer;
+    u8->setFont(u8g2_font_profont17_tf);
+    u8->setCursor(SB_COL_WORDS, STATUSBAR_Y);
+    u8->printf("%s WORDS", formatNumber(wordCount).c_str());
 
-    String right = savedTok + " | " + formatNumber(wordCount) + " words | " + locLabel;
+    // LOCALE - only when it isn't the US default; the default layout is implied
+    String locale = app["config"]["keyboard_layout"].as<String>();
+    if (!(locale.isEmpty() || locale == "null" || locale == "US"))
+    {
+        u8->setCursor(SB_COL_LOCALE, STATUSBAR_Y);
+        u8->print(sbUpper(locale).c_str());
+    }
 
-    // battery last, flush to the edge; -1 on boards with no sense line
+    // SAVE STATE + BATTERY - flush to the right edge. SAVED just disappears while
+    // unsaved (no placeholder), so the eye only catches the state it can act on.
+    // Battery is -1 on boards with no sense line, and then omitted.
+    String right = Editor::getInstance().saved ? String("SAVED") : String("");
     int batt = battery_percent();
     if (batt >= 0)
-        right += " | " + String(batt) + "%";
+        right += (right.isEmpty() ? String("") : String("  ")) + String(batt) + "%";
+    if (!right.isEmpty())
+    {
+        u8->setCursor(SB_EDGE_RIGHT - u8->getUTF8Width(right.c_str()), STATUSBAR_Y);
+        u8->print(right.c_str());
+    }
 
-    // While a background sync (Ctrl+U) is running, the right group shows its
-    // progress instead; a finished/failed sync lingers ~3s then reverts.
+    // SYNC FLASH (Ctrl+U) - an inverted band over the right of the bar while the
+    // sync runs, lingering ~3s on the result. Same inverted treatment as the
+    // hidden-bar toast, so transient messages read the same way everywhere.
     static unsigned int sync_clear_at = 0;
+    String flash;
     int sync_state = app["sync_state"].as<int>();
     if (sync_state == SYNC_STARTED || sync_state == SYNC_PROGRESS)
     {
         sync_clear_at = 0; // still running
         String msg = app["sync_message"].as<String>();
-        right = msg.isEmpty() ? String("syncing...") : capUtf8(msg, 38);
+        flash = msg.isEmpty() ? String("SYNCING...") : capUtf8(msg, 30);
     }
     else if (sync_state == SYNC_COMPLETED || sync_state == SYNC_ERROR)
     {
@@ -961,19 +986,34 @@ void WP_render_status(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             {
                 String msg = app["sync_message"].as<String>();
                 msg.trim();
-                right = msg.isEmpty() ? String("synced") : capUtf8(msg, 38);
+                flash = msg.isEmpty() ? String("SYNCED") : capUtf8(msg, 30);
             }
             else // SYNC_ERROR — surface the actual reason (WiFi / URL / …)
             {
                 String err = app["sync_error"].as<String>();
                 err.trim();
-                right = err.isEmpty() ? String("sync failed") : capUtf8(err, 38);
+                flash = err.isEmpty() ? String("SYNC FAILED") : capUtf8(err, 30);
             }
         }
     }
 
-    u8->setCursor(395 - u8->getUTF8Width(right.c_str()), STATUSBAR_Y);
-    u8->print(right.c_str());
+    if (!flash.isEmpty())
+    {
+        flash = sbUpper(flash);
+        int tw = u8->getUTF8Width(flash.c_str());
+        int boxX = SB_FLASH_X;
+        if (SB_EDGE_RIGHT - tw - 10 < boxX)
+            boxX = SB_EDGE_RIGHT - tw - 10;
+        if (boxX < 0)
+            boxX = 0;
+        display->drawFilledRectangle(boxX, STATUSBAR_Y - 15, screen_width, screen_height, 1);
+        u8->setForegroundColor(ST7305_COLOR_WHITE);
+        u8->setBackgroundColor(ST7305_COLOR_BLACK);
+        u8->setCursor(boxX + 10, STATUSBAR_Y);
+        u8->print(flash.c_str());
+        u8->setForegroundColor(ST7305_COLOR_BLACK);
+        u8->setBackgroundColor(ST7305_COLOR_WHITE);
+    }
 }
 
 // Full-screen modal shown at boot when unsaved text was recovered.
@@ -983,29 +1023,23 @@ void WP_render_recovery(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u
     u8->setForegroundColor(ST7305_COLOR_BLACK);
     u8->setBackgroundColor(ST7305_COLOR_WHITE);
 
-    display->drawLine(0, 95, screen_width, 95, 1);
-    display->drawLine(0, 225, screen_width, 225, 1);
-
-    u8->setFont(u8g2_font_profont22_mf);
-    u8->setCursor(40, 130);
-    u8->printf("RECOVERED TEXT");
+    RLCD_drawWindow(display, u8, 30, 70, 336, 160, "RECOVERED TEXT");
 
     u8->setFont(u8g2_font_profont17_tf);
-    u8->setCursor(40, 165);
+    u8->setCursor(50, 132);
     u8->printf("Last session ended without saving.");
-    u8->setCursor(40, 190);
+    u8->setCursor(50, 158);
     u8->printf("Unsaved text was found.");
 
-    u8->setCursor(40, 255);
-    u8->printf("Enter = Restore     Esc = Discard");
+    static const RLCD_Hint HINTS[] = {{"ENT", "RESTORE"}, {"ESC", "DISCARD"}};
+    RLCD_drawHintBar(display, u8, (400 - RLCD_hintBarWidth(u8, RLCD_HINTS(HINTS))) / 2, 202,
+                     RLCD_HINTS(HINTS));
 }
 
 //
 // Render Cursor
 void WP_render_cursor(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
-    JsonDocument &app = status();
-
     // Cursor information
     static int cursorLinePos_prev = 0;
     int cursorLinePos = Editor::getInstance().cursorLinePos;

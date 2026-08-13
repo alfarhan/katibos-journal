@@ -2,6 +2,7 @@
 #include "../Menu.h"
 #include "app/app.h"
 #include "display/display.h"
+#include "display/RLCD/display_RLCD.h"
 #include "service/Editor/Editor.h"
 
 // Erase all notes + reset preferences. Connectivity (Wi-Fi creds, sync URL/git,
@@ -18,33 +19,39 @@ void FactoryReset_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u
 
 void FactoryReset_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
-    Menu_drawHeader(display, u8, "FACTORY RESET");
+    // Same dialog shape as Delete file / Rename: a window on an empty field,
+    // with the keys it answers to directly beneath it.
+    const int wx = 24, wy = 46, ww = 352, wh = 176;
+    RLCD_drawWindow(display, u8, wx, wy, ww, wh, "FACTORY RESET");
 
     u8->setFont(u8g2_font_profont17_tf);
-    u8->setCursor(10, 70);
+    u8->setCursor(wx + 16, wy + 54);
     u8->print("Erase ALL notes and reset settings?");
-    u8->setCursor(10, 100);
+    u8->setCursor(wx + 16, wy + 80);
     u8->print("Wi-Fi & sync stay configured.");
 
-    u8->setCursor(10, 150);
+    u8->setCursor(wx + 16, wy + 118);
     u8->print("This cannot be undone on the device.");
-    u8->setCursor(10, 172);
+    u8->setCursor(wx + 16, wy + 140);
     u8->print("Sync first to keep a safe copy.");
 
     if (g_armed)
     {
-        display->drawFilledRectangle(8, 196, 392, 222, 1);
+        display->drawFilledRectangle(wx + 8, wy + 150, wx + ww - 8, wy + 172, 1);
         u8->setForegroundColor(ST7305_COLOR_WHITE);
         u8->setBackgroundColor(ST7305_COLOR_BLACK);
-        u8->setCursor(16, 215);
+        u8->setCursor(wx + 16, wy + 167);
         u8->print("Press Y again to ERASE EVERYTHING");
         u8->setForegroundColor(ST7305_COLOR_BLACK);
         u8->setBackgroundColor(ST7305_COLOR_WHITE);
     }
 
-    display->drawLine(0, 276, 400, 276, 1);
-    u8->setCursor(10, 296);
-    u8->print(g_armed ? "[Y] ERASE      [B] cancel" : "[Y] continue   [B] back");
+    static const RLCD_Hint ARMED[] = {{"Y", "ERASE"}, {"B", "CANCEL"}};
+    static const RLCD_Hint IDLE[] = {{"Y", "CONTINUE"}, {"B", "BACK"}};
+    if (g_armed)
+        RLCD_drawHintBar(display, u8, wx, wy + wh + 32, RLCD_HINTS(ARMED));
+    else
+        RLCD_drawHintBar(display, u8, wx, wy + wh + 32, RLCD_HINTS(IDLE));
 }
 
 static void wipe(JsonDocument &app)

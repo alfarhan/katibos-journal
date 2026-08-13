@@ -1,6 +1,7 @@
 #include "Menu.h"
 #include "app/app.h"
 #include "display/display.h"
+#include "display/RLCD/display_RLCD.h"
 #include "../WordProcessor/WordProcessor.h"
 
 // Menu Sub Modules
@@ -344,9 +345,22 @@ void Menu_clear()
 
 // Shared FILES / SETTINGS tab strip, drawn just under the title bar. The active
 // tab gets an inverse bar; the inactive one is plain. ←/→ switch between them.
+// A small deck: the About mark shrunk to a title-bar icon.
+static void drawDeckIcon(ST7305_4p2_BW_DisplayDriver *display, int x, int y)
+{
+    display->drawRectangle(x, y, x + 12, y + 15, 1);
+    display->drawRectangle(x + 2, y + 2, x + 10, y + 8, 1);
+    display->drawFilledRectangle(x + 3, y + 11, x + 9, y + 13, 1);
+}
+
 void Menu_drawTabs(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, int activeTab)
 {
-    int y = 18;
+    // The two tab screens are the desktop, so they carry the system title bar;
+    // every other screen gets its own title through Menu_drawHeader.
+    int iconX = RLCD_drawTitleBar(display, u8, 0, 0, 400, 26, "katibOS  كاتب", 20);
+    drawDeckIcon(display, iconX, 5);
+
+    int y = 46;
     u8->setFont(u8g2_font_profont17_tf);
 
     // FILES
@@ -380,13 +394,12 @@ void Menu_drawTabs(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, in
     }
 
     // divider under the header tabs
-    display->drawLine(0, 28, 400, 28, 1);
+    display->drawLine(0, 56, 400, 56, 1);
 }
 
 void Menu_drawHeader(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, const char *title)
 {
-    u8->setFont(u8g2_font_profont17_tf);
-    u8->setCursor(8, 18);
-    u8->print(title);
-    display->drawLine(0, 28, 400, 28, 1);
+    // window title bar across the full width - every sub-screen reads as one
+    // window, and the centered title works the same in Arabic and Latin
+    RLCD_drawTitleBar(display, u8, 0, 0, 400, 28, title);
 }

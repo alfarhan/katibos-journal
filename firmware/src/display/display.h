@@ -77,7 +77,6 @@
 #define WORD_RIGHT 1120
 
 // insert today's date (YYYY-MM-DD) at the caret (Ctrl+D)
-#define DATE_INSERT 1121
 
 // jump caret to the previous / next paragraph (Ctrl+Up / Ctrl+Down)
 #define PARA_UP 1122
