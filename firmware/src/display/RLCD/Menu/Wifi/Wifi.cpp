@@ -69,18 +69,16 @@ void Wifi_render_entry(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8
 
     // actions in aligned key / label columns
     u8->setCursor(14, 150);
-    u8->print("[Enter]");
+    u8->print("ENT");
     u8->setCursor(120, 150);
     u8->print("Edit name + password");
 
     u8->setCursor(14, 178);
-    u8->print("[F]");
+    u8->print("F");
     u8->setCursor(120, 178);
     u8->print("Forget this network");
 
-    display->drawLine(0, 276, 400, 276, 1);
-    u8->setCursor(10, 296);
-    u8->print("[B] back");
+
 }
 
 //
@@ -99,18 +97,11 @@ void Wifi_render_list(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     int cursor = paginate::clampInt(app["wifi_cursor"] | 0, 0, count > 0 ? count - 1 : 0);
     int page = paginate::pageOf(cursor, WIFI_PER_PAGE);
     int rows = paginate::rowsOnPage(page, WIFI_PER_PAGE, count);
-    int pages = paginate::pageCount(count, WIFI_PER_PAGE);
 
     u8->setFont(u8g2_font_profont17_tf);
     u8->setCursor(10, 46);
     u8->print("SAVED NETWORKS:");
-    if (pages > 1)
-    {
-        char pg[12];
-        snprintf(pg, sizeof(pg), "p%d/%d", page + 1, pages);
-        u8->setCursor(392 - u8->getUTF8Width(pg), 46);
-        u8->print(pg);
-    }
+    RLCD_drawScrollbar(display, 384, 56, 286, page * WIFI_PER_PAGE, WIFI_PER_PAGE, count);
 
     if (count == 0)
     {
@@ -126,7 +117,7 @@ void Wifi_render_list(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
         if (focused)
         {
-            display->drawFilledRectangle(8, y - 15, 392, y + 4, 1);
+            display->drawFilledRectangle(8, y - 15, 378, y + 4, 1);
             u8->setForegroundColor(ST7305_COLOR_WHITE);
             u8->setBackgroundColor(ST7305_COLOR_BLACK);
         }
@@ -144,9 +135,7 @@ void Wifi_render_list(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         }
     }
 
-    display->drawLine(0, 276, 400, 276, 1);
-    u8->setCursor(8, 296);
-    u8->print("[Enter] open [S] scan [N] new [B] back");
+
 }
 
 // Four signal bars of rising height, filled to the strength level (RSSI dBm).
@@ -194,17 +183,10 @@ void Wifi_render_scan(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     int cursor = paginate::clampInt(app["wifi_cursor"] | 0, 0, count > 0 ? count - 1 : 0);
     int page = paginate::pageOf(cursor, WIFI_PER_PAGE);
     int rows = paginate::rowsOnPage(page, WIFI_PER_PAGE, count);
-    int pages = paginate::pageCount(count, WIFI_PER_PAGE);
 
     u8->setCursor(10, 46);
     u8->print("NEARBY NETWORKS:");
-    if (pages > 1)
-    {
-        char pg[12];
-        snprintf(pg, sizeof(pg), "p%d/%d", page + 1, pages);
-        u8->setCursor(392 - u8->getUTF8Width(pg), 46);
-        u8->print(pg);
-    }
+    RLCD_drawScrollbar(display, 384, 56, 286, page * WIFI_PER_PAGE, WIFI_PER_PAGE, count);
 
     if (count == 0)
     {
@@ -220,7 +202,7 @@ void Wifi_render_scan(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
         if (focused)
         {
-            display->drawFilledRectangle(8, y - 15, 392, y + 4, 1);
+            display->drawFilledRectangle(8, y - 15, 378, y + 4, 1);
             u8->setForegroundColor(ST7305_COLOR_WHITE);
             u8->setBackgroundColor(ST7305_COLOR_BLACK);
         }
@@ -240,9 +222,7 @@ void Wifi_render_scan(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         }
     }
 
-    display->drawLine(0, 276, 400, 276, 1);
-    u8->setCursor(8, 296);
-    u8->print("[Enter] select  [R] rescan  [B] back");
+
 }
 
 void Wifi_render_edit(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
@@ -251,12 +231,6 @@ void Wifi_render_edit(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     JsonDocument &app = status();
     int wifi_config_index = app["wifi_config_index"].as<int>();
     int wifi_config_status = app["wifi_config_status"].as<int>();
-
-    // Load saved WiFi connection information from the app["config"]["access_points"] array
-    JsonArray savedAccessPoints = app["wifi"]["access_points"].as<JsonArray>();
-
-    const char *savedSsid = savedAccessPoints[wifi_config_index]["ssid"];
-    const char *savedPassword = savedAccessPoints[wifi_config_index]["password"];
 
     u8->printf(" EDIT [%d] WIFI CONFIG", wifi_config_index + 1);
     u8->println("");

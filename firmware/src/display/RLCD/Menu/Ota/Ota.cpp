@@ -2,6 +2,7 @@
 #include "../Menu.h"
 #include "app/app.h"
 #include "display/display.h"
+#include "display/RLCD/display_RLCD.h"
 #include "service/Updater/Ota.h"
 
 // Blocking steps (Wi-Fi connect, download, flash) are deferred by one render so
@@ -43,22 +44,28 @@ static void drawScreen(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8
         u8->print(msg.c_str());
     }
 
-    // footer hint follows the state
-    const char *hint;
-    if (st == OTA_AVAILABLE)
-        hint = "[Enter] install   [Esc] back";
-    else if (st == OTA_DONE)
-        hint = "[Enter] reboot";
-    else if (st == OTA_CHECKING || st == OTA_DOWNLOADING)
-        hint = "Please wait ...";
-    else if (st == OTA_UPTODATE || st == OTA_ERROR)
-        hint = "[Enter] retry   [Esc] back";
-    else
-        hint = "[Esc] back";
+    // footer hints follow the state, centered
+    static const RLCD_Hint H_INSTALL[] = {{"ENT", "INSTALL"}, {"ESC", "BACK"}};
+    static const RLCD_Hint H_REBOOT[] = {{"ENT", "REBOOT"}};
+    static const RLCD_Hint H_RETRY[] = {{"ENT", "RETRY"}, {"ESC", "BACK"}};
+    static const RLCD_Hint H_BACK[] = {{"ESC", "BACK"}};
+
+    const RLCD_Hint *hints = H_BACK;
+    int nhints = 1;
+    if (st == OTA_AVAILABLE) { hints = H_INSTALL; nhints = 2; }
+    else if (st == OTA_DONE) { hints = H_REBOOT; nhints = 1; }
+    else if (st == OTA_UPTODATE || st == OTA_ERROR) { hints = H_RETRY; nhints = 2; }
+
     display->drawLine(0, 276, 400, 276, 1);
-    int hw = u8->getUTF8Width(hint);
-    u8->setCursor((400 - hw) / 2, 296);
-    u8->print(hint);
+    if (st == OTA_CHECKING || st == OTA_DOWNLOADING)
+    {
+        const char *wait = "Please wait ...";
+        u8->setCursor((400 - u8->getUTF8Width(wait)) / 2, 296);
+        u8->print(wait);
+    }
+    else
+        RLCD_drawHintBar(display, u8, (400 - RLCD_hintBarWidth(u8, hints, nhints)) / 2, 296,
+                         hints, nhints);
 
     // progress bar, drawn only while a download is running
     int pct = app["ota_progress"] | -1;

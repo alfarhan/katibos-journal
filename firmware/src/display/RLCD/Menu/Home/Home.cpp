@@ -112,7 +112,6 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     int pos_x = 10;
     int page = paginate::pageOf(g_cursor, HOME_PER_PAGE);
     int rows = paginate::rowsOnPage(page, HOME_PER_PAGE, g_count);
-    int pages = paginate::pageCount(g_count, HOME_PER_PAGE);
 
     Menu_drawTabs(display, u8, 0);
 
@@ -120,12 +119,12 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     for (int r = 0; r < rows; r++)
     {
         int idx = g_indices[page * HOME_PER_PAGE + r];
-        int y = 52 + r * 20;
+        int y = 76 + r * 22;
         bool focused = (page * HOME_PER_PAGE + r == g_cursor);
 
         if (focused)
         {
-            display->drawFilledRectangle(pos_x - 2, y - 15, 399, y + 4, 1);
+            display->drawFilledRectangle(pos_x - 2, y - 15, 380, y + 4, 1);
             u8->setForegroundColor(ST7305_COLOR_WHITE);
             u8->setBackgroundColor(ST7305_COLOR_BLACK);
         }
@@ -142,7 +141,7 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         // be capped to whatever space is left of it)
         char cnt[16];
         snprintf(cnt, sizeof(cnt), "%d w", Home_wordCount(idx));
-        int cntX = 392 - u8->getUTF8Width(cnt);
+        int cntX = 374 - u8->getUTF8Width(cnt);
         u8->setCursor(cntX, y);
         u8->print(cnt);
 
@@ -169,23 +168,8 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         }
     }
 
-    // divider above the file-action hints, then the hints on one line. The
-    // divider sits ~20px above the text baseline so the whitespace below the
-    // line matches the whitespace below the header title (header: text 18,
-    // line 28 -> ~10px of visible gap).
-    display->drawLine(0, 276, 400, 276, 1);
-    u8->setFont(u8g2_font_profont17_tf);
-    u8->setCursor(pos_x, 296);
-    u8->print("Enter | Rename | Delete | New");
-
-    // page indicator in the footer (right), clear of the header date+time
-    if (pages > 1)
-    {
-        char pg[12];
-        snprintf(pg, sizeof(pg), "p%d/%d", page + 1, pages);
-        u8->setCursor(392 - u8->getUTF8Width(pg), 296);
-        u8->print(pg);
-    }
+    // scrollbar in the right gutter - where the list stands, at a glance
+    RLCD_drawScrollbar(display, 384, 64, 286, page * HOME_PER_PAGE, HOME_PER_PAGE, g_count);
 }
 
 //
@@ -248,9 +232,11 @@ void Home_keyboard(char key)
         return;
     }
 
-    // Delete the focused file (load it first so deleteFile targets the right
-    // file) - the confirmation screen performs the deletion
-    if (key == 'D' || key == 'd')
+    // Delete the focused file with X (load it first so deleteFile targets the
+    // right file) - the confirmation screen performs the deletion. X rather
+    // than D leaves that letter for the USB Drive jump, which then works in
+    // every menu including this one.
+    if (key == 'X' || key == 'x')
     {
         if (g_count > 0)
         {
@@ -287,8 +273,18 @@ void Home_keyboard(char key)
     // Record FILES as the tab to return to, so Esc lands back here, not Settings.
     if (key == 'L' || key == 'l') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_LAYOUT; return; }
     if (key == 'W' || key == 'w') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_WIFI; return; }
-    if (key == 'U' || key == 'u') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_STORAGE; return; }
+    if (key == 'D' || key == 'd') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_STORAGE; return; }
     if (key == 'H' || key == 'h') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_HELP; return; }
+#ifdef USE_BLE_KEYBOARD_HOST
+    if (key == 'K' || key == 'k') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_BLUETOOTH; return; }
+#endif
+    if (key == 'P' || key == 'p')
+    {
+        app["menu"]["return"] = MENU_HOME;
+        app["menu"]["prefs_from_editor"] = false; // Esc lands back on the file list
+        app["menu"]["state"] = MENU_PREFS;
+        return;
+    }
     if ((key == 'S' || key == 's') &&
         (!app["config"]["sync"]["url"].as<String>().isEmpty() ||
          app["config"]["sync"]["provider"].as<String>() == "git"))
@@ -297,7 +293,7 @@ void Home_keyboard(char key)
         app["menu"]["state"] = MENU_SYNC;
         return;
     }
-    if (key == 'P' || key == 'p')
+    if (key == 'U' || key == 'u')
     {
         app["menu"]["return"] = MENU_HOME;
         app["menu"]["state"] = MENU_UPDATE;

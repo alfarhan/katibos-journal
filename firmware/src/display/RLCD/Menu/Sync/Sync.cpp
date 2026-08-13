@@ -2,6 +2,7 @@
 #include "../Menu.h"
 #include "app/app.h"
 #include "display/display.h"
+#include "display/RLCD/display_RLCD.h"
 //
 #include "service/WifiEntry/WifiEntry.h"
 #include "service/Sync/Sync.h"
@@ -62,11 +63,19 @@ void Sync_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     // footer: divider + hint (matches Settings/Help). Terminal states invite a
     // key press to leave; while syncing, ask the writer to wait.
     bool done = (sync_state == SYNC_COMPLETED || sync_state == SYNC_ERROR);
-    const char *hint = done ? "Press any key to exit" : "Please wait ...";
     display->drawLine(0, 276, 400, 276, 1);
-    int hw = u8->getUTF8Width(hint);
-    u8->setCursor((400 - hw) / 2, 296);
-    u8->print(hint);
+    if (done)
+    {
+        static const RLCD_Hint HINTS[] = {{"ANY KEY", "EXIT"}};
+        RLCD_drawHintBar(display, u8, (400 - RLCD_hintBarWidth(u8, RLCD_HINTS(HINTS))) / 2, 296,
+                         RLCD_HINTS(HINTS));
+    }
+    else
+    {
+        const char *wait = "Please wait ...";
+        u8->setCursor((400 - u8->getUTF8Width(wait)) / 2, 296);
+        u8->print(wait);
+    }
 }
 
 //

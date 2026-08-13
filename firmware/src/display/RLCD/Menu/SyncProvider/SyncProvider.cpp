@@ -2,6 +2,7 @@
 #include "../Menu.h"
 #include "app/app.h"
 #include "display/display.h"
+#include "display/RLCD/display_RLCD.h"
 #include "display/RLCD/Menu/FileList/Pagination.h"
 
 // Which sync backend reconcile uses. The code stored in config.sync.provider is
@@ -93,9 +94,7 @@ void SyncProvider_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *
     u8->setCursor(14, 48 + (PROVIDER_N + 1) * pitch);
     u8->print("GitHub repo/token set in config.json");
 
-    display->drawLine(0, 276, 400, 276, 1);
-    u8->setCursor(8, 296);
-    u8->print("[UP/DN] move  [ENT] select  [<-] back");
+
 }
 
 void SyncProvider_keyboard(char key)

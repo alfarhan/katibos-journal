@@ -332,14 +332,10 @@ void keyboard_keypad_68_loop()
         {
             int sc = status()["screen"].as<int>();
             bool editor = (sc == WORDPROCESSOR);
-            bool textEntry = editor ||
-                             (sc == MENUSCREEN &&
-                              status()["menu"]["state"].as<int>() == MENU_RENAME);
 
-            // DATE_INSERT and HELP_KEY are handled once in WP_keyboard with no
-            // pressed-guard, so emit a single edge (both edges would double-fire).
-            if (c == 4 && textEntry) { display_keyboard(DATE_INSERT, false); return; } // Ctrl+D
-            if (c == 31 && editor)   { display_keyboard(HELP_KEY, false); return; }     // Ctrl+/
+            // HELP_KEY is handled once in WP_keyboard with no pressed-guard, so
+            // emit a single edge (both edges would double-fire).
+            if (c == 31 && editor) { display_keyboard(HELP_KEY, false); return; } // Ctrl+/
 
             // Clipboard/select-all/undo/redo are gated to the key-down edge in
             // Editor::keyboardImpl, so emit press+release (release is a no-op).

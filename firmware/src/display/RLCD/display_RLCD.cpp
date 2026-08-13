@@ -28,7 +28,11 @@ U8G2_FOR_ST73XX u8g2;
 #define LBL_FONT u8g2_font_profont17_tf
 #define LBL_FONT_ARABIC u8g2_font_10x20_t_arabic
 
-int RLCD_drawShapedLabel(U8G2_FOR_ST73XX *u8, int x, int y, const char *utf8, bool baseHintRTL)
+// Shape + lay out a label, drawing it only when `draw` is set. Measuring runs
+// the identical path, so a centered label is placed with the exact width it
+// will occupy (a label may mix Arabic and Latin, i.e. two fonts, two metrics).
+static int RLCD_shapedLabel(U8G2_FOR_ST73XX *u8, int x, int y, const char *utf8,
+                            bool baseHintRTL, bool draw)
 {
     if (!utf8 || !*utf8)
         return 0;
@@ -47,10 +51,11 @@ int RLCD_drawShapedLabel(U8G2_FOR_ST73XX *u8, int x, int y, const char *utf8, bo
         b[bl] = 0;
         int w = u8->getUTF8Width(b);
 
-        u8->drawGlyph(x, y, cells[c].glyph);
+        if (draw)
+            u8->drawGlyph(x, y, cells[c].glyph);
 
         // overlay combining harakat centered over the base glyph (no advance)
-        for (int m = 0; m < cells[c].nmarks; m++)
+        for (int m = 0; draw && m < cells[c].nmarks; m++)
         {
             u8->setFont(LBL_FONT_ARABIC);
             char mb[4];
@@ -65,6 +70,124 @@ int RLCD_drawShapedLabel(U8G2_FOR_ST73XX *u8, int x, int y, const char *utf8, bo
 
     u8->setFont(LBL_FONT); // restore the default label font for the caller
     return x - startX;
+}
+
+int RLCD_drawShapedLabel(U8G2_FOR_ST73XX *u8, int x, int y, const char *utf8, bool baseHintRTL)
+{
+    return RLCD_shapedLabel(u8, x, y, utf8, baseHintRTL, true);
+}
+
+int RLCD_shapedLabelWidth(U8G2_FOR_ST73XX *u8, const char *utf8, bool baseHintRTL)
+{
+    return RLCD_shapedLabel(u8, 0, 0, utf8, baseHintRTL, false);
+}
+
+// Hint bar geometry. HINT_PAD is the chip's inner padding, HINT_GAP the space
+// between a key and its chip, HINT_SEP the space between two hints - the gap
+// between pairs stays wider than the gap inside one so the pairs read as units.
+#define HINT_PAD 4
+#define HINT_GAP 6
+#define HINT_SEP 14
+
+int RLCD_hintBarWidth(U8G2_FOR_ST73XX *u8, const RLCD_Hint *hints, int n)
+{
+    u8->setFont(LBL_FONT);
+    int w = 0;
+    for (int i = 0; i < n; i++)
+    {
+        if (hints[i].key && *hints[i].key)
+            w += u8->getUTF8Width(hints[i].key) + HINT_GAP;
+        w += u8->getUTF8Width(hints[i].verb) + HINT_PAD * 2 + HINT_SEP;
+    }
+    return w > 0 ? w - HINT_SEP : 0;
+}
+
+int RLCD_drawHintBar(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8,
+                     int x, int y, const RLCD_Hint *hints, int n)
+{
+    u8->setFont(LBL_FONT);
+    for (int i = 0; i < n; i++)
+    {
+        if (hints[i].key && *hints[i].key)
+        {
+            u8->setCursor(x, y);
+            u8->print(hints[i].key);
+            x += u8->getUTF8Width(hints[i].key) + HINT_GAP;
+        }
+
+        int vw = u8->getUTF8Width(hints[i].verb);
+        display->drawFilledRectangle(x, y - 15, x + vw + HINT_PAD * 2, y + 3, 1);
+        u8->setForegroundColor(ST7305_COLOR_WHITE);
+        u8->setBackgroundColor(ST7305_COLOR_BLACK);
+        u8->setCursor(x + HINT_PAD, y);
+        u8->print(hints[i].verb);
+        u8->setForegroundColor(ST7305_COLOR_BLACK);
+        u8->setBackgroundColor(ST7305_COLOR_WHITE);
+        x += vw + HINT_PAD * 2 + HINT_SEP;
+    }
+    return x - HINT_SEP;
+}
+
+// Title bar: stripes across the band, title in a cleared tab centered over them.
+// The tab is what makes the stripes read as chrome rather than noise, so it is
+// cleared (not just drawn over) - the panel has no anti-aliasing to hide seams.
+int RLCD_drawTitleBar(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8,
+                      int x, int y, int w, int h, const char *title, int iconW)
+{
+    for (int sy = y + 4; sy <= y + h - 5; sy += 3)
+        display->drawLine(x + 4, sy, x + w - 4, sy, 1);
+
+    if (!title || !*title)
+        return x;
+
+    // shaped, so a title carrying Arabic renders (and measures) correctly
+    int tw = RLCD_shapedLabelWidth(u8, title, false);
+    int iconX = x + (w - tw - iconW) / 2;
+    display->drawFilledRectangle(iconX - 8, y + 2, iconX + iconW + tw + 8, y + h - 2, 0);
+    RLCD_drawShapedLabel(u8, iconX + iconW, y + h - 7, title, false);
+    return iconX;
+}
+
+#define WIN_SHADOW 3
+
+void RLCD_drawWindow(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8,
+                     int x, int y, int w, int h, const char *title)
+{
+    display->drawFilledRectangle(x + WIN_SHADOW, y + WIN_SHADOW,
+                                 x + w + WIN_SHADOW, y + h + WIN_SHADOW, 1);
+    display->drawFilledRectangle(x, y, x + w, y + h, 0);
+    display->drawRectangle(x, y, x + w, y + h, 1);
+
+    if (title && *title)
+    {
+        const int barH = 22;
+        RLCD_drawTitleBar(display, u8, x, y, w, barH, title);
+        display->drawLine(x, y + barH, x + w, y + barH, 1);
+    }
+}
+
+void RLCD_drawScrollbar(ST7305_4p2_BW_DisplayDriver *display, int x, int yTop, int yBottom,
+                        int first, int visible, int total)
+{
+    if (total <= visible || visible <= 0)
+        return;
+
+    const int w = 10;
+    display->drawRectangle(x, yTop, x + w, yBottom, 1);
+
+    int track = yBottom - yTop - 4;
+    int thumb = track * visible / total;
+    if (thumb < 8)
+        thumb = 8;
+    // A paged list steps by a whole page, so the last page's first row can sit
+    // past the last scrollable position - clamp or the thumb runs off the track.
+    int span = total - visible;
+    if (first > span)
+        first = span;
+    if (first < 0)
+        first = 0;
+    int off = span > 0 ? (track - thumb) * first / span : 0;
+    display->drawFilledRectangle(x + 2, yTop + 2 + off, x + w - 2, yTop + 2 + off + thumb, 1);
 }
 
 int display_RLCD_core()

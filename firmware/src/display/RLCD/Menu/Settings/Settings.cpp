@@ -2,6 +2,7 @@
 #include "../Menu.h"
 #include "app/app.h"
 #include "display/display.h"
+#include "display/RLCD/display_RLCD.h"
 #include "display/RLCD/Menu/FileList/Pagination.h"
 
 enum
@@ -45,6 +46,9 @@ static int buildList(int *ids)
     return n;
 }
 
+// Card labels: one word where possible. A card is a third of the screen wide,
+// so the long forms ("Check for Update") don't fit - the icon carries the rest
+// of the meaning.
 static const char *actionLabel(int act)
 {
     switch (act)
@@ -52,25 +56,129 @@ static const char *actionLabel(int act)
     case ACT_PREFS: return "Preferences";
     case ACT_LANGUAGE: return "Language";
     case ACT_WIFI: return "Wi-Fi";
-    case ACT_SYNC: return "Sync & Backup";
-    case ACT_SYNCPROV: return "Sync provider";
+    case ACT_SYNC: return "Sync";
+    case ACT_SYNCPROV: return "Provider";
 #ifdef USE_BLE_KEYBOARD_HOST
-    case ACT_BTKB: return "Connect Keyboard";
+    case ACT_BTKB: return "Keyboard";
 #endif
-    case ACT_DRIVE: return "Drive Mode (USB)";
-    case ACT_UPDATE: return "Check for Update";
+    case ACT_DRIVE: return "USB Drive";
+    case ACT_UPDATE: return "Update";
     case ACT_HELP: return "Help";
     case ACT_ABOUT: return "About";
     }
     return "";
 }
 
-// Right-pointing chevron drawn from two short strokes (font-independent, crisper
-// than a '>' glyph). `color` lets the caller invert it on a focused row.
-static void drawChevron(ST7305_4p2_BW_DisplayDriver *display, int xr, int y, uint16_t color)
+// The single-key jump for a row (Settings_keyboard's fast-paths), shown on the
+// right of the row the way a menu shows its shortcut - so the keys get learned
+// by passing over them instead of only from the help screen.
+static const char *actionKey(int id)
 {
-    display->drawLine(xr - 8, y - 9, xr - 1, y - 2, color);
-    display->drawLine(xr - 1, y - 2, xr - 8, y + 5, color);
+    switch (id)
+    {
+    case ACT_PREFS: return "P";
+    case ACT_WIFI: return "W";
+    case ACT_SYNC: return "S";
+#ifdef USE_BLE_KEYBOARD_HOST
+    case ACT_BTKB: return "K";
+#endif
+    case ACT_DRIVE: return "D";
+    case ACT_HELP: return "H";
+    case ACT_UPDATE: return "U";
+    }
+    return "";
+}
+
+// ---- card icons -----------------------------------------------------------
+// Each draws inside a 28x28 box at (x,y) in `ink`, so a focused (inverted) card
+// gets the same shape in white. Line art only - no glyph, no font dependency.
+
+static void iconPrefs(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+{
+    // three sliders, knobs at different positions
+    for (int i = 0; i < 3; i++)
+    {
+        int ly = y + 6 + i * 8;
+        d->drawLine(x + 2, ly, x + 26, ly, ink);
+        d->drawFilledRectangle(x + 4 + i * 8, ly - 3, x + 9 + i * 8, ly + 3, ink);
+    }
+}
+
+static void iconWifi(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+{
+    // three widening arcs over a dot
+    for (int i = 0; i < 3; i++)
+    {
+        int s = 4 + i * 5;
+        d->drawLine(x + 14 - s, y + 16 - s / 2, x + 14, y + 10 - s, ink);
+        d->drawLine(x + 14, y + 10 - s, x + 14 + s, y + 16 - s / 2, ink);
+    }
+    d->drawFilledRectangle(x + 12, y + 20, x + 16, y + 24, ink);
+}
+
+static void iconSync(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+{
+    // two arrows chasing each other
+    d->drawLine(x + 4, y + 9, x + 24, y + 9, ink);
+    d->drawFilledTriangle(x + 24, y + 4, x + 24, y + 14, x + 28, y + 9, ink);
+    d->drawLine(x + 4, y + 19, x + 24, y + 19, ink);
+    d->drawFilledTriangle(x + 4, y + 14, x + 4, y + 24, x, y + 19, ink);
+}
+
+static void iconDrive(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+{
+    // 3.5" floppy, same mark the Storage panel uses
+    d->drawRectangle(x + 1, y + 1, x + 27, y + 27, ink);
+    d->drawFilledRectangle(x + 8, y + 3, x + 20, y + 11, ink);
+    d->drawFilledRectangle(x + 13, y + 4, x + 16, y + 10, ink);
+    d->drawRectangle(x + 6, y + 16, x + 22, y + 26, ink);
+}
+
+static void iconUpdate(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+{
+    // arrow landing in a tray
+    d->drawLine(x + 14, y + 2, x + 14, y + 14, ink);
+    d->drawFilledTriangle(x + 8, y + 12, x + 20, y + 12, x + 14, y + 20, ink);
+    d->drawLine(x + 4, y + 24, x + 24, y + 24, ink);
+    d->drawLine(x + 4, y + 20, x + 4, y + 24, ink);
+    d->drawLine(x + 24, y + 20, x + 24, y + 24, ink);
+}
+
+#ifdef USE_BLE_KEYBOARD_HOST
+static void iconKeyboard(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+{
+    d->drawRectangle(x + 1, y + 6, x + 27, y + 22, ink);
+    for (int r = 0; r < 2; r++)
+        for (int c = 0; c < 5; c++)
+            d->drawFilledRectangle(x + 5 + c * 4, y + 10 + r * 5, x + 7 + c * 4, y + 12 + r * 5, ink);
+}
+#endif
+
+static void iconHelp(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+{
+    // question mark, drawn so it inverts with the card like the rest
+    d->drawLine(x + 8, y + 8, x + 10, y + 4, ink);
+    d->drawLine(x + 10, y + 4, x + 18, y + 4, ink);
+    d->drawLine(x + 18, y + 4, x + 20, y + 8, ink);
+    d->drawLine(x + 20, y + 8, x + 14, y + 14, ink);
+    d->drawLine(x + 14, y + 14, x + 14, y + 18, ink);
+    d->drawFilledRectangle(x + 12, y + 22, x + 16, y + 26, ink);
+}
+
+static void drawActionIcon(ST7305_4p2_BW_DisplayDriver *d, int act, int x, int y, uint16_t ink)
+{
+    switch (act)
+    {
+    case ACT_PREFS: iconPrefs(d, x, y, ink); break;
+    case ACT_WIFI: iconWifi(d, x, y, ink); break;
+    case ACT_SYNC: iconSync(d, x, y, ink); break;
+#ifdef USE_BLE_KEYBOARD_HOST
+    case ACT_BTKB: iconKeyboard(d, x, y, ink); break;
+#endif
+    case ACT_DRIVE: iconDrive(d, x, y, ink); break;
+    case ACT_UPDATE: iconUpdate(d, x, y, ink); break;
+    case ACT_HELP: iconHelp(d, x, y, ink); break;
+    }
 }
 
 static void dispatch(int act)
@@ -109,64 +217,51 @@ void Settings_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
 void Settings_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
-    JsonDocument &app = status();
-
     Menu_drawTabs(display, u8, 1);
 
     int ids[12];
     int n = buildList(ids);
 
-    // Settings as a list of cells filling the band between the header and footer.
-    // Each cell: label (left), value or chevron (right); the focused cell is a
-    // full-width inverse bar; thin rules separate the rest so it reads as a list.
-    // Pitch is derived from the item count so the list always fits above the
-    // footer (it grew to 8 rows) and stays evenly spaced for shorter lists.
-    const int top = 34;     // first cell top, just under the header divider
-    const int footY = 276;  // footer divider
-    const int xl = 24;      // label left edge
-    const int xr = 378;     // value / chevron right edge
-    int pitch = (footY - top) / n;
-    if (pitch > 38)
-        pitch = 38;                      // don't over-stretch a short list
-    const int baseOff = (pitch + 15) / 2; // vertically center the glyph
+    // Settings as a grid of tiles, three to a row: icon, name, and the key that
+    // opens it. Each tile is a small window (shadow + frame); the focused one
+    // fills black, the same inversion the file list and the hint chips use. The
+    // tiles carry their own keys, so this screen needs no footer hint bar.
+    const int MX = 10, GAP = 8, COLS = 3;
+    const int top = 64, bottom = 292;
+    int rows = (n + COLS - 1) / COLS;
+    int cardW = (400 - 2 * MX - (COLS - 1) * GAP) / COLS;
+    int cardH = (bottom - top - (rows - 1) * GAP) / rows;
+    bool tall = cardH >= 90;
 
-    u8->setFont(u8g2_font_profont17_tf);
-    for (int r = 0; r < n; r++)
+    for (int i = 0; i < n; i++)
     {
-        int cellTop = top + r * pitch;
-        int y = cellTop + baseOff; // text baseline, centered in the cell
-        bool focused = (r == g_cursor);
+        int cx = MX + (i % COLS) * (cardW + GAP);
+        int cy = top + (i / COLS) * (cardH + GAP);
+        bool focused = (i == g_cursor);
+
+        RLCD_drawWindow(display, u8, cx, cy, cardW, cardH, nullptr);
+        if (focused)
+            display->drawFilledRectangle(cx + 1, cy + 1, cx + cardW - 1, cy + cardH - 1, 1);
+
+        uint16_t ink = focused ? ST7305_COLOR_WHITE : ST7305_COLOR_BLACK;
+        drawActionIcon(display, ids[i], cx + (cardW - 28) / 2, cy + (tall ? 14 : 4), ink);
 
         if (focused)
         {
-            display->drawFilledRectangle(0, cellTop, 400, cellTop + pitch, 1);
             u8->setForegroundColor(ST7305_COLOR_WHITE);
             u8->setBackgroundColor(ST7305_COLOR_BLACK);
         }
 
-        u8->setCursor(xl, y);
-        u8->print(actionLabel(ids[r]));
+        u8->setFont(u8g2_font_profont17_tf);
+        const char *label = actionLabel(ids[i]);
+        u8->setCursor(cx + (cardW - u8->getUTF8Width(label)) / 2, cy + cardH - (tall ? 34 : 22));
+        u8->print(label);
 
-        // Language + Time zone carry a value; the rest open a sub-screen, marked
-        // with a chevron so the affordance is obvious.
-        if (ids[r] == ACT_LANGUAGE)
+        const char *jump = actionKey(ids[i]);
+        if (*jump)
         {
-            String loc = app["config"]["keyboard_layout"].as<String>();
-            if (loc.isEmpty() || loc == "null")
-                loc = "US";
-            u8->setCursor(xr - u8->getUTF8Width(loc.c_str()), y);
-            u8->print(loc.c_str());
-        }
-        else if (ids[r] == ACT_SYNCPROV)
-        {
-            const char *prov =
-                (app["config"]["sync"]["provider"].as<String>() == "git") ? "GitHub" : "Drive";
-            u8->setCursor(xr - u8->getUTF8Width(prov), y);
-            u8->print(prov);
-        }
-        else
-        {
-            drawChevron(display, xr, y, focused ? ST7305_COLOR_WHITE : ST7305_COLOR_BLACK);
+            u8->setCursor(cx + (cardW - u8->getUTF8Width(jump)) / 2, cy + cardH - (tall ? 12 : 6));
+            u8->print(jump);
         }
 
         if (focused)
@@ -174,16 +269,7 @@ void Settings_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             u8->setForegroundColor(ST7305_COLOR_BLACK);
             u8->setBackgroundColor(ST7305_COLOR_WHITE);
         }
-
-        // hairline between cells (the inverse bar owns its own boundaries)
-        if (r < n - 1 && !focused && r + 1 != g_cursor)
-            display->drawLine(xl, cellTop + pitch, xr, cellTop + pitch, 1);
     }
-
-    // divider above the footer hints (matches the header text/line spacing)
-    display->drawLine(0, 276, 400, 276, 1);
-    u8->setCursor(6, 296);
-    u8->print("[UP/DN] move  [ENT] open");
 }
 
 void Settings_keyboard(int key)
@@ -192,19 +278,40 @@ void Settings_keyboard(int key)
     int ids[12];
     int n = buildList(ids);
 
-    if (key == 20) // Up
+    const int COLS = 3;
+    if (key == 20) // Up - previous row
     {
-        g_cursor = paginate::clampInt(g_cursor - 1, 0, n - 1);
+        if (g_cursor >= COLS)
+            g_cursor -= COLS;
         Menu_clear();
         return;
     }
-    if (key == 21) // Down
+    if (key == 21) // Down - next row, clamped to the last (possibly short) row
     {
-        g_cursor = paginate::clampInt(g_cursor + 1, 0, n - 1);
+        if (g_cursor + COLS < n)
+            g_cursor += COLS;
+        else if (g_cursor / COLS < (n - 1) / COLS)
+            g_cursor = n - 1;
         Menu_clear();
         return;
     }
-    if (key == 18 || key == 'B' || key == 'b' || key == '\b') // Left / Back -> Files
+    if (key == 19) // Right - next tile in the row
+    {
+        if (g_cursor % COLS != COLS - 1 && g_cursor + 1 < n)
+            g_cursor++;
+        Menu_clear();
+        return;
+    }
+    if (key == 18) // Left - previous tile, or out to FILES from the first column
+    {
+        if (g_cursor % COLS != 0)
+            g_cursor--;
+        else
+            app["menu"]["state"] = MENU_HOME;
+        Menu_clear();
+        return;
+    }
+    if (key == 'B' || key == 'b' || key == '\b') // Back -> Files
     {
         app["menu"]["state"] = MENU_HOME;
         return;
@@ -222,13 +329,13 @@ void Settings_keyboard(int key)
     }
 
     // letter fast-paths (Language/Time zone/Sync provider/About moved to Preferences)
-    if (key == 'R' || key == 'r') dispatch(ACT_PREFS);
+    if (key == 'P' || key == 'p') dispatch(ACT_PREFS);
     else if (key == 'W' || key == 'w') dispatch(ACT_WIFI);
     else if (key == 'S' || key == 's') dispatch(ACT_SYNC);
 #ifdef USE_BLE_KEYBOARD_HOST
     else if (key == 'K' || key == 'k') dispatch(ACT_BTKB);
 #endif
-    else if (key == 'U' || key == 'u') dispatch(ACT_DRIVE);
+    else if (key == 'D' || key == 'd') dispatch(ACT_DRIVE);
     else if (key == 'H' || key == 'h') dispatch(ACT_HELP);
-    else if (key == 'P' || key == 'p') dispatch(ACT_UPDATE);
+    else if (key == 'U' || key == 'u') dispatch(ACT_UPDATE);
 }

@@ -35,7 +35,7 @@ Tags: **[wired]** = config field already exists, just needs a control ·
 ## Time & locale ★
 - Time zone offset — currently **hardcoded to KSA**; make it a setting — **[new]**
 - 12 / 24-hour clock
-- **Date style for Ctrl+D: Gregorian / Hijri / ISO** ★
+- **Date insert + style: Gregorian / Hijri / ISO** ★ — needs a chord; the old Ctrl+D emitted an action code nothing handled and was removed in 1.5.0
 - Set clock manually (for when there's no Wi-Fi / NTP)
 
 ## Writing goals
@@ -59,7 +59,7 @@ Tags: **[wired]** = config field already exists, just needs a control ·
 ## Recommended order
 1. **Quick wins (mostly [wired], fast):** font size, theme/invert, brightness,
    daily-goal value, auto-sleep.
-2. **On-brand standouts:** Hijri date option for Ctrl+D, configurable time zone.
+2. **On-brand standouts:** Hijri date insert, configurable time zone.
 3. **Dream / large:** Arabic UI (separate project).
 
 Status: brainstorm only — none built yet.

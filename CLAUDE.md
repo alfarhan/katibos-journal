@@ -33,7 +33,14 @@ Waveshare enumerates as native USB-CDC (`ARDUINO_USB_CDC_ON_BOOT`); it's BLE-LE 
 - **Editor commands** map to shared action codes (`SEL_*`, `COPY`, `SELECTALL`, …) in `display/display.h`; matrix/BLE deliver them via HID, serial via `Keypad_68.cpp` shims.
 - **Battery** (`service/Battery/`) — Waveshare only (`-D BATTERY` in that env): the 18650 on **GPIO4 = ADC1_CH3** behind the board's **3× divider**, sampled every 10s and mapped to a percent via a Li-ion discharge table; shown in the editor status bar. rev_8 has no sense line (cell → charger/step-up module → ESP32, nothing on an ADC), so the module compiles inert there and `battery_percent()` returns -1, which the status bar omits. ADC1 is deliberate — ADC2 is unusable with Wi-Fi on.
 - **Sync** (`service/Sync/`) — Drive (Apps Script) or git provider (`config.sync.git`, token on-device). **OTA** (`service/Updater/Ota.cpp`) — Wi-Fi manifest at `KATIBOS_UPDATE_URL` (board-specific, set per-env in `platformio.ini`: microjournal → `latest.json`, waveshare → `latest_waveshare.json`, both in this repo); the bin download follows GitHub's cross-host redirect manually with a `setInsecure()` TLS client. Each manifest points at that board's bin on the `alfarhan/katibos` releases.
+- **UI kit** (`display/RLCD/display_RLCD.h`) — the shared drawing vocabulary; use these instead of hand-rolling a screen. `RLCD_drawTitleBar` (striped bar, title in a cleared tab — `Menu_drawHeader`/`Menu_drawTabs` call it, so *no screen draws its own header*), `RLCD_drawWindow` (shadow + frame + optional title bar: dialogs and info panels), `RLCD_drawHintBar` (key in plain text + verb on an inverted chip), `RLCD_drawScrollbar`, `RLCD_drawShapedLabel` / `RLCD_shapedLabelWidth` (Arabic-safe label, measure-then-place). Conventions: verbs uppercase, `^` = Ctrl/Fn, no brackets around keys, no screen draws a divider under the header, and only the four confirm dialogs keep a hint bar (sat under their window, not pinned to the screen bottom).
 - Design/context docs: `firmware/doc/KATIBOS.md`, `SYSTEM_OPTIONS.md`, `DEVICE_SYNC.md`.
+
+## Menu keys
+
+One letter per destination, the same everywhere it's handled (file list, Settings grid, Help): **P** Preferences · **L** Language · **W** Wi-Fi · **S** Sync · **D** USB Drive · **U** Update · **H** Help · **K** Keyboard (BLE builds only). File list: `ENT` open · `R` rename · `X` delete · `N` new · `←/→` switch tab. From the editor, **Ctrl+,** opens Preferences and **Ctrl+.** the Settings tab (both via a one-shot `menu.goto` that `Menu_setup` consumes).
+
+Two traps this key map already walked into: a screen's own back key shadows a list letter (`B` used to eat `[B] Belgian` in Language — Esc/Left are the back keys there now), and the file list's `X`-for-delete exists so `D` can stay the global USB Drive jump. Keep `Help.cpp`'s tables in sync with the handlers — they are the only user-facing documentation of these keys.
 
 ## Cutting a release
 

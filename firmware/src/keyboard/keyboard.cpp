@@ -366,18 +366,25 @@ void keyboard_HID2Ascii(uint8_t keycode, uint8_t modifier, bool pressed)
     return;
   }
 
-  // Ctrl + D inserts the date+time at the caret, in either text-entry context:
-  // the editor or the Rename title field.
+  // Ctrl + . opens the SETTINGS tab, the same way Ctrl + , opens Preferences -
+  // the two neighbouring keys reach the two setting surfaces.
+  if (keycode == 0x37 && ctrl)
   {
-    int sc = status()["screen"].as<int>();
-    bool textEntry = (sc == WORDPROCESSOR) ||
-                     (sc == MENUSCREEN && status()["menu"]["state"].as<int>() == MENU_RENAME);
-    if (keycode == 0x07 && ctrl && textEntry)
+    if (pressed)
     {
-      if (pressed)
-        display_keyboard(DATE_INSERT, false, keycode);
-      return;
+      JsonDocument &app = status();
+      if (app["screen"].as<int>() == MENUSCREEN)
+      {
+        app["menu"]["state"] = MENU_SETTINGS;
+        Menu_clear(); // mark dirty so the menu repaints the new screen
+      }
+      else
+      {
+        app["menu"]["goto"] = MENU_SETTINGS;
+        app["screen"] = MENUSCREEN;
+      }
     }
+    return;
   }
 
   // Ctrl + A/C/X/V/Z/Y: select-all / copy / cut / paste / undo / redo (mirror

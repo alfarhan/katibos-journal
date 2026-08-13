@@ -23,39 +23,39 @@ void Rename_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     JsonDocument &app = status();
     int fi = app["config"]["file_index"].as<int>();
 
-    Menu_drawHeader(display, u8, "Rename file");
+    // the rename prompt is a dialog, so it carries its own title bar
+    RLCD_drawWindow(display, u8, 12, 44, 376, 176, "RENAME FILE");
 
-    const int xl = 20;
+    const int xl = 32;
     u8->setFont(u8g2_font_profont17_tf);
 
     // field label
-    u8->setCursor(xl, 70);
+    u8->setCursor(xl, 96);
     u8->print("New title");
 
     // input box — a clear text field so it's obvious where typing lands
-    const int bx = xl, by = 84, bw = 360, bh = 32;
+    const int bx = xl, by = 106, bw = 336, bh = 32;
     display->drawRectangle(bx, by, bx + bw, by + bh, 1);
     int caretX = RLCD_drawShapedLabel(u8, bx + 10, by + 22, capUtf8(buffer_get(), 30).c_str(), false);
     u8->setFont(u8g2_font_profont17_tf);
     u8->drawGlyph(bx + 10 + caretX, by + 22, '_');
 
     // secondary hint
-    u8->setCursor(xl, 150);
+    u8->setCursor(xl, 172);
     u8->print("Leave blank to auto-name from line 1.");
 
     // current title, for reference
     String current = app["config"][format("title_%d", fi)].as<String>();
     if (!current.isEmpty() && current != "null")
     {
-        u8->setCursor(xl, 190);
+        u8->setCursor(xl, 202);
         u8->print("Current:  ");
-        RLCD_drawShapedLabel(u8, u8->getCursorX(), 190, capUtf8(current, 22).c_str(), false);
+        RLCD_drawShapedLabel(u8, u8->getCursorX(), 202, capUtf8(current, 22).c_str(), false);
     }
 
-    display->drawLine(0, 276, 400, 276, 1);
     u8->setFont(u8g2_font_profont17_tf);
-    u8->setCursor(xl, 296);
-    u8->print("[ENT] save   [ESC] cancel");
+    static const RLCD_Hint HINTS[] = {{"ENT", "SAVE"}, {"ESC", "CANCEL"}};
+    RLCD_drawHintBar(display, u8, 12, 252, RLCD_HINTS(HINTS));
 }
 
 void Rename_keyboard(int key)

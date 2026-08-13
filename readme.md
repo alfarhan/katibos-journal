@@ -11,6 +11,8 @@ and trimmed to the rev_8 OS only.
 - Arabic-first menu/UX: file titles, rename, file browser
 - Editor Options (Ctrl+,): text flow, line spacing, text align (incl. justify), theme, status bar
 - Distraction-free hidden status bar (reclaims a text line; top-left toasts)
+- Classic-Mac menu UI: striped title bars, dialog windows, an icon grid for Settings,
+  and shortcuts shown as inverted keycaps (Ctrl+. jumps straight there)
 - Google Drive two-way sync, and **OTA Wi-Fi updates** (Settings → Check for Update)
 
 ## Layout
