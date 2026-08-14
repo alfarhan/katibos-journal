@@ -7,6 +7,7 @@ void idle_sleep_check(unsigned long quietMs); // defined with the sleep stages b
 
 static void (*g_onEnter)() = nullptr;
 static void (*g_onExit)() = nullptr;
+static void (*g_onSleep)(bool) = nullptr;
 static unsigned long g_lastActivity = 0;
 static bool g_active = false;
 
@@ -14,10 +15,11 @@ static bool g_active = false;
 // while you think, short enough to matter over an afternoon.
 static const int IDLE_DEFAULT_SEC = 60;
 
-void idle_setup(void (*onEnter)(), void (*onExit)())
+void idle_setup(void (*onEnter)(), void (*onExit)(), void (*onSleep)(bool deep))
 {
     g_onEnter = onEnter;
     g_onExit = onExit;
+    g_onSleep = onSleep;
     g_lastActivity = millis();
     g_active = false;
 }
@@ -159,6 +161,11 @@ static void enterLightSleep()
 {
     _log("[idle] light sleep\n");
 
+    // Drawn before the chip stops: the panel refreshes from its own RAM, so this
+    // frame is what stays on screen for the whole nap.
+    if (g_onSleep)
+        g_onSleep(false);
+
     keypad_prepare_wake();
     unsigned long long mask = keypad_wake_mask();
     for (int gpio = 0; gpio < 48; gpio++)
@@ -187,6 +194,9 @@ static void enterDeepSleep()
     // written by saveFile(), and loadFile() restores it on the next boot, so this
     // comes back exactly where the writer left off.
     Editor::getInstance().saveFile();
+
+    if (g_onSleep)
+        g_onSleep(true);
 
     keypad_prepare_wake();
     esp_sleep_enable_ext1_wakeup(keypad_wake_mask(), ESP_EXT1_WAKEUP_ANY_HIGH);

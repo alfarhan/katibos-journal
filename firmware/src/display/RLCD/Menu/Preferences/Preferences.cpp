@@ -19,6 +19,7 @@ enum
     R_FLOW,
     R_STATUS,
     R_IDLE,
+    R_SAVER,
     R_SLEEP,
     R_DEEP,
     R_LAYOUT,
@@ -40,6 +41,7 @@ static const PRow ROWS[] = {
     {R_FLOW, "Text flow"},
     {R_STATUS, "Status bar"},
     {R_IDLE, "Power save"},
+    {R_SAVER, "Rest screen"},
     {R_SLEEP, "Sleep"},
     {R_DEEP, "Shut down"},
     {R_HEAD, "INPUT"},
@@ -63,6 +65,8 @@ static bool isShown(int i)
 {
     if (ROWS[i].type == R_SLEEP || ROWS[i].type == R_DEEP)
         return sleep_supported();
+    if (ROWS[i].type == R_SAVER)
+        return idle_timeout_sec() > 0; // nothing rests if Power save is Off
     return true;
 }
 static bool isSel(int i) { return ROWS[i].type != R_HEAD && isShown(i); }
@@ -84,6 +88,8 @@ static String valueStr(JsonDocument &app, int type)
         return FLOW_LBL[(app["config"]["scroll_mode"] | 2) % 3];
     case R_STATUS:
         return app["config"]["statusbar_hidden"].as<bool>() ? "Hidden" : "Shown";
+    case R_SAVER:
+        return (app["config"]["screensaver"] | false) ? "On" : "Off";
     case R_SLEEP:
     case R_DEEP:
     {
@@ -130,6 +136,11 @@ static void cycle(JsonDocument &app, int type, int dir)
         break;
     case R_STATUS:
         app["config"]["statusbar_hidden"] = !app["config"]["statusbar_hidden"].as<bool>();
+        break;
+    case R_SAVER:
+        // Off by default: it hides your text, and on a reflective panel there is
+        // no burn-in for it to prevent.
+        app["config"]["screensaver"] = !(app["config"]["screensaver"] | false);
         break;
     case R_SLEEP:
     case R_DEEP:

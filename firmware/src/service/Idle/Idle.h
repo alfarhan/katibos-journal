@@ -12,9 +12,11 @@
 // Waveshare that is both the serial console AND the keyboard, so the device
 // would idle into a state where typing can't wake it.
 
-// Register what to do when entering / leaving the idle state (the panel mode
-// switch lives with the driver, so the caller supplies it).
-void idle_setup(void (*onEnter)(), void (*onExit)());
+// Register what to do when entering / leaving the idle state, and what to draw
+// just before the chip sleeps (the panel and its drawing live with the driver, so
+// the caller supplies all three). onSleep is passed true for a shut down, false
+// for a nap, so the two can say different things.
+void idle_setup(void (*onEnter)(), void (*onExit)(), void (*onSleep)(bool deep) = nullptr);
 
 // Any user input. Resets the countdown and leaves idle immediately.
 void idle_touch();
