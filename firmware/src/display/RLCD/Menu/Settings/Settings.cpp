@@ -305,21 +305,11 @@ void Settings_openCard(int id) { dispatch(id); }
 void Settings_drawCard(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8,
                        int id, int x, int y, int w, int h, bool focused)
 {
-    // The combined Home screen gives a card less height than the full grid does,
-    // so the mark shrinks rather than pushing the name off the bottom edge.
-    const int ICON = (h >= 60) ? 28 : 20;
-    const int CAP = 12, ICON_GAP = 6;
-    int blockY = (h - (ICON + ICON_GAP + CAP)) / 2;
-    if (blockY < 2)
-        blockY = 2;
-
     RLCD_drawWindow(display, u8, x, y, w, h, nullptr);
     if (focused)
         display->drawFilledRectangle(x + 1, y + 1, x + w - 1, y + h - 1, 1);
 
     uint16_t ink = focused ? ST7305_COLOR_WHITE : ST7305_COLOR_BLACK;
-    drawActionIcon(display, id, x + (w - ICON) / 2, y + blockY, ink);
-
     if (focused)
     {
         u8->setForegroundColor(ST7305_COLOR_WHITE);
@@ -327,8 +317,29 @@ void Settings_drawCard(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8
     }
     u8->setFont(u8g2_font_profont17_tf);
     const char *label = actionLabel(id);
-    drawKeyedLabel(display, u8, x + (w - u8->getUTF8Width(label)) / 2,
-                   y + blockY + ICON + ICON_GAP + CAP, label, actionKey(id), ink);
+
+    const int ICON = 28, CAP = 12, GAP = 8;
+    if (h < ICON + CAP + 12)
+    {
+        // Short and wide: mark on the left, name beside it, both centred on the
+        // card's middle line. This is what lets a card be half as tall - nothing
+        // is stacked, so the height only has to clear the icon.
+        int iy = y + (h - ICON) / 2;
+        drawActionIcon(display, id, x + 10, iy, ink);
+        drawKeyedLabel(display, u8, x + 10 + ICON + GAP, y + (h + CAP) / 2, label,
+                       actionKey(id), ink);
+    }
+    else
+    {
+        // Tall enough to stack: mark over the name, centred.
+        int blockY = (h - (ICON + 6 + CAP)) / 2;
+        if (blockY < 2)
+            blockY = 2;
+        drawActionIcon(display, id, x + (w - ICON) / 2, y + blockY, ink);
+        drawKeyedLabel(display, u8, x + (w - u8->getUTF8Width(label)) / 2,
+                       y + blockY + ICON + 6 + CAP, label, actionKey(id), ink);
+    }
+
     if (focused)
     {
         u8->setForegroundColor(ST7305_COLOR_BLACK);

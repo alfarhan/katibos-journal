@@ -20,15 +20,33 @@
 static const int HOME_MAX_FILES = 100;
 // The list shares the screen with the settings cards now, so a "page" is what
 // fits above the divider rather than the whole panel.
-static const int HOME_PER_PAGE = 4;
+#define HOME_PER_PAGE Home_listRows()
 
 // Geometry of the combined screen. Cards are 3 across because "Preferences" is
 // 98px and a 4-across card would only be 91 - measured, not guessed.
 static const int LIST_TOP = 52;   // first row baseline
 static const int LIST_PITCH = 22;
-static const int DIVIDER_Y = 134;
-static const int CARD_TOP = 142;
-static const int CARD_COLS = 3;
+static const int CARD_COLS = 2;   // wide cards: mark left, name right
+static const int CARD_H = 32;     // enough to clear the 28px icon
+static const int CARD_GAP = 4;
+
+// The card block is sized from how many cards this board actually has - a BLE
+// build has nine (Keyboard) and needs a fifth row - and the file list takes
+// whatever is left. Hardcoding either one squashed the icons on one board or
+// wasted a row on the other.
+static int Home_cardRows()
+{
+    int ids[16];
+    int n = Settings_cards(ids, 16);
+    return (n + CARD_COLS - 1) / CARD_COLS;
+}
+static int Home_cardTop() { return 292 - (Home_cardRows() * CARD_H + (Home_cardRows() - 1) * CARD_GAP); }
+static int Home_dividerY() { return Home_cardTop() - 8; }
+static int Home_listRows()
+{
+    int rows = (Home_dividerY() - 6 - LIST_TOP) / LIST_PITCH + 1;
+    return rows < 1 ? 1 : rows;
+}
 
 // Which half has the cursor. Tab moves between them; the arrows stay inside.
 static bool g_inCards = false;
@@ -216,23 +234,22 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         }
     }
 
-    Home_drawMacScroll(display, SBX, 36, DIVIDER_Y - 8,
+    Home_drawMacScroll(display, SBX, 36, Home_dividerY() - 6,
                        page * HOME_PER_PAGE, HOME_PER_PAGE, g_count);
 
-    display->drawLine(0, DIVIDER_Y, 400, DIVIDER_Y, 1);
+    display->drawLine(0, Home_dividerY(), 400, Home_dividerY(), 1);
 
     // ---- the same cards the Settings tab drew, three across
     int ids[16];
     int n = Settings_cards(ids, 16);
     const int MX = 8, GAP = 6;
     int cw = (400 - 2 * MX - (CARD_COLS - 1) * GAP) / CARD_COLS;
-    int crows = (n + CARD_COLS - 1) / CARD_COLS;
-    int ch = (292 - CARD_TOP - (crows - 1) * 5) / crows;
+    int ch = CARD_H;
 
     for (int i = 0; i < n; i++)
     {
         int cx = MX + (i % CARD_COLS) * (cw + GAP);
-        int cy = CARD_TOP + (i / CARD_COLS) * (ch + 5);
+        int cy = Home_cardTop() + (i / CARD_COLS) * (ch + CARD_GAP);
         Settings_drawCard(display, u8, ids[i], cx, cy, cw, ch, g_inCards && i == g_card);
     }
 }
