@@ -93,6 +93,9 @@
 // scroll mode / status bar while a file is open
 #define OPTIONS_KEY 1126
 
+// send the open file to the AI speller and replace it with the result (Ctrl+G)
+#define AI_PROOFREAD 1127
+
 //
 void display_setup();
 void display_loop();

@@ -238,6 +238,26 @@ static int dump_frame(const char *path)
         keyboard_HID2Ascii(0x0b, 0, false);
     }
 
+    // EMU_AI: pump app_loop() (which drives ai_loop) until a Ctrl+G proofread
+    // pass reaches a terminal state, so the headless dump can run the whole
+    // request/replace flow against a local stand-in endpoint.
+    if (getenv("EMU_AI"))
+    {
+        void app_loop();
+        for (int i = 0; i < 400; i++)
+        {
+            app_loop();
+            display_loop();
+            int st = status()["ai_state"] | 0;
+            if (st == 2 || st == 3) // AI_DONE / AI_ERROR
+            {
+                for (int k = 0; k < 6; k++) { display_loop(); SDL_Delay(20); }
+                break;
+            }
+            SDL_Delay(20);
+        }
+    }
+
     // EMU_SYNC: pump app_loop() (which drives sync_loop) until a sync triggered
     // by the injected keys completes. Lets the headless dump run a real Ctrl+U
     // sync end-to-end against the live Drive endpoint.

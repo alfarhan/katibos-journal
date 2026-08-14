@@ -23,6 +23,7 @@
 
 #ifdef BOARD_ESP32_S3
 #include "service/Sync/Sync.h"
+#include "service/Ai/Ai.h"
 #endif
 
 #ifdef BATTERY
@@ -172,6 +173,7 @@ void app_loop()
 
 #ifdef BOARD_ESP32_S3
     sync_loop();
+    ai_loop(); // Ctrl+G proofread, same task-dispatch pattern as sync
 #endif
 }
 

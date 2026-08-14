@@ -27,6 +27,7 @@ HOST_CPP := host_main.cpp host_runtime.cpp host_log.cpp host_st7305.cpp \
 # ---- real firmware sources we compile against ----
 FW_CPP := \
   $(SRC)/service/Sync/SyncCore.cpp \
+  $(SRC)/service/Ai/Ai.cpp \
   $(SRC)/display/display.cpp \
   $(SRC)/display/RLCD/display_RLCD.cpp \
   $(SRC)/display/RLCD/WordProcessor/WordProcessor.cpp \

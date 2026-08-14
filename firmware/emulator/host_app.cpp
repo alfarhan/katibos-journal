@@ -61,9 +61,11 @@ void app_setup()
 // Fake sync engine (host_fake_sync.cpp) — pumped here so the Sync screen
 // progresses over time the way the real background sync task would on-device.
 void sync_loop();
+void ai_loop(); // Ctrl+G proofread, pumped on the same background pass
 
 void app_loop()
 {
     // Drive the fake sync progression; no battery / dual-core tasks on host.
     sync_loop();
+    ai_loop();
 }

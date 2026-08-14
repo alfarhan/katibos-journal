@@ -7,6 +7,7 @@
 
 //
 #include "service/Editor/Editor.h"
+#include "service/Ai/Ai.h"
 #include "service/Editor/EditorViewport.h"
 #include "service/Bidi/Bidi.h"
 #include "service/Tools/TextUtil.h"
@@ -333,6 +334,21 @@ void WP_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
                 Editor::getInstance().pageChanged = true; // force a full redraw
             }
             app["sync_reload"] = -1; // one-shot: applied or skipped
+        }
+
+        // Ctrl+G rewrote the whole file underneath us, so the editor's window and
+        // cached counts are stale. Same one-shot shape, same don't-clobber-live-
+        // edits guard.
+        int air = app["ai_reload"] | -1;
+        if (air >= 0 && app["ai_state"].as<int>() == AI_DONE &&
+            air == app["config"]["file_index"].as<int>())
+        {
+            if (Editor::getInstance().saved)
+            {
+                Editor::getInstance().loadFile(format("/%d.txt", air));
+                Editor::getInstance().pageChanged = true;
+            }
+            app["ai_reload"] = -1;
         }
     }
 
@@ -828,6 +844,39 @@ static String sbUpper(const String &s)
 // - word count
 // - keyboard layout
 // - saved status / battery
+// Ctrl+G proofread progress, shown in the same transient slot the sync flash
+// uses (the two can't run at once). Empty when there is nothing to report; the
+// result lingers ~4s - longer than sync's 3s, because the "check _backup.txt"
+// note is the user's only pointer back to the original.
+static String wp_ai_flash()
+{
+    JsonDocument &app = status();
+    int st = app["ai_state"] | AI_IDLE;
+    if (st == AI_IDLE)
+        return "";
+
+    static unsigned int clear_at = 0;
+    if (st == AI_RUNNING)
+    {
+        clear_at = 0;
+        String msg = app["ai_message"].as<String>();
+        return msg.isEmpty() ? String("AI ...") : capUtf8(msg, 34);
+    }
+    if (clear_at == 0)
+        clear_at = millis() + 4000;
+    if (millis() >= clear_at)
+    {
+        app["ai_state"] = AI_IDLE; // retire it so the sync flash works again
+        clear_at = 0;
+        return "";
+    }
+    String msg = app["ai_message"].as<String>();
+    msg.trim();
+    if (msg.isEmpty())
+        msg = (st == AI_ERROR) ? "AI FAILED" : "CORRECTED";
+    return capUtf8(msg, 34);
+}
+
 void WP_render_status(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
     JsonDocument &app = status();
@@ -849,8 +898,12 @@ void WP_render_status(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         static unsigned int sync_toast_until = 0;
         int sync_state = app["sync_state"].as<int>();
 
-        String toast;
-        if (sync_state == SYNC_STARTED || sync_state == SYNC_PROGRESS)
+        String toast = wp_ai_flash();
+        if (!toast.isEmpty())
+        {
+            /* AI progress owns the toast this frame */
+        }
+        else if (sync_state == SYNC_STARTED || sync_state == SYNC_PROGRESS)
         {
             sync_toast_until = 0; // still running
             String msg = app["sync_message"].as<String>();
@@ -968,9 +1021,13 @@ void WP_render_status(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     // sync runs, lingering ~3s on the result. Same inverted treatment as the
     // hidden-bar toast, so transient messages read the same way everywhere.
     static unsigned int sync_clear_at = 0;
-    String flash;
+    String flash = wp_ai_flash();
     int sync_state = app["sync_state"].as<int>();
-    if (sync_state == SYNC_STARTED || sync_state == SYNC_PROGRESS)
+    if (!flash.isEmpty())
+    {
+        sync_clear_at = 0; // AI progress owns the band this frame
+    }
+    else if (sync_state == SYNC_STARTED || sync_state == SYNC_PROGRESS)
     {
         sync_clear_at = 0; // still running
         String msg = app["sync_message"].as<String>();
@@ -1195,6 +1252,16 @@ void WP_keyboard(int key, bool pressed, int index)
         app["sync_scope"] = "all";
         sync_init();
         sync_start_request();
+        return;
+    }
+
+    // Ctrl+G: hand the open file to the AI speller. Runs on the background core,
+    // so typing stays live; the status bar carries the stages. Saves first - the
+    // service corrects the FILE, and the buffer is only a window over it.
+    if (key == AI_PROOFREAD)
+    {
+        Editor::getInstance().saveFile();
+        ai_request(app);
         return;
     }
 

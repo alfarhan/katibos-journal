@@ -334,6 +334,15 @@ void keyboard_HID2Ascii(uint8_t keycode, uint8_t modifier, bool pressed)
     }
   }
 
+  // Ctrl + G sends the OPEN file to the AI speller (editor only). Keycode, not
+  // ASCII, so it works under any keyboard layout - same as Ctrl+U above.
+  if (keycode == 0x0a && ctrl && status()["screen"].as<int>() == WORDPROCESSOR)
+  {
+    if (pressed)
+      display_keyboard(AI_PROOFREAD, false, keycode);
+    return;
+  }
+
   // Ctrl + / (or Ctrl+?) opens the editor shortcut overlay; any key closes it.
   if (keycode == 0x38 && ctrl && status()["screen"].as<int>() == WORDPROCESSOR)
   {
