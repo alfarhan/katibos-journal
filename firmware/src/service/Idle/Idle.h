@@ -27,3 +27,18 @@ bool idle_active();
 
 // Configured timeout in seconds; 0 means never throttle.
 int idle_timeout_sec();
+
+// ---- sleep (Tier 2 / Tier 3) -----------------------------------------------
+// Both are OFF by default and both are only offered on a board whose keys are
+// wired to the chip: a BLE keyboard cannot wake a radio that is off, and USB-CDC
+// input does not survive a sleep. On any other board these report 0 and nothing
+// ever sleeps.
+//
+//  light  esp_light_sleep_start(). RAM is retained, so it resumes mid-loop with
+//         the document, window and caret exactly as they were.
+//  deep   esp_deep_sleep_start(). RAM is gone and it restarts from setup(), so
+//         the file is saved first; boot reopens it at the stored caret, which the
+//         editor already does on its own (caret_N in config).
+int  sleep_light_sec(); // 0 = never
+int  sleep_deep_sec();  // 0 = never
+bool sleep_supported(); // false when no key can wake this board

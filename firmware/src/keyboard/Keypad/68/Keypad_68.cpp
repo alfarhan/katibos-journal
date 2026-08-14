@@ -517,3 +517,42 @@ int keyboard_keypad_68_get_key(keypadEvent e)
     // return the corresponding key
     return key;
 }
+
+// ---- sleep wake support -----------------------------------------------------
+#if defined(BOARD_ESP32_S3) && !defined(USE_SERIAL_KEYBOARD)
+
+void keypad_prepare_wake()
+{
+    // Hold every column HIGH so a closed key can source current into its row.
+    for (int c = 0; c < COLS; c++)
+    {
+        pinMode(colPins[c], OUTPUT);
+        digitalWrite(colPins[c], HIGH);
+    }
+    // Rows read LOW while nothing is pressed, HIGH the moment any key closes.
+    for (int r = 0; r < ROWS; r++)
+        pinMode(rowPins[r], INPUT_PULLDOWN);
+}
+
+void keypad_resume_scan()
+{
+    // Adafruit_Keypad owns the pin directions during a scan; re-running begin()
+    // is the supported way to get them back rather than reproducing its setup.
+    customKeypad.begin();
+}
+
+unsigned long long keypad_wake_mask()
+{
+    unsigned long long mask = 0;
+    for (int r = 0; r < ROWS; r++)
+        mask |= (1ULL << rowPins[r]);
+    return mask;
+}
+
+#else // no matrix wired to this chip - nothing can wake it by key
+
+void keypad_prepare_wake() {}
+void keypad_resume_scan() {}
+unsigned long long keypad_wake_mask() { return 0; }
+
+#endif

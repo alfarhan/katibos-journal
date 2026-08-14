@@ -19,6 +19,8 @@ enum
     R_FLOW,
     R_STATUS,
     R_IDLE,
+    R_SLEEP,
+    R_DEEP,
     R_LAYOUT,
     R_PROV,
     R_FACTORY,
@@ -38,6 +40,8 @@ static const PRow ROWS[] = {
     {R_FLOW, "Text flow"},
     {R_STATUS, "Status bar"},
     {R_IDLE, "Power save"},
+    {R_SLEEP, "Sleep"},
+    {R_DEEP, "Shut down"},
     {R_HEAD, "INPUT"},
     {R_LAYOUT, "Keyboard layout"},
     {R_HEAD, "SYNC"},
@@ -53,7 +57,15 @@ static int g_top = 0;    // first visible row (scroll window)
 static const char *SPACE_LBL[] = {"Normal", "Relaxed", "Spacious", "Compact"};
 static const char *FLOW_LBL[] = {"Top", "Middle", "Bottom"};
 
-static bool isSel(int i) { return ROWS[i].type != R_HEAD; }
+// A row can be hidden outright: the sleep rows are meaningless on a board whose
+// keyboard cannot wake it, and showing a dead setting is worse than showing none.
+static bool isShown(int i)
+{
+    if (ROWS[i].type == R_SLEEP || ROWS[i].type == R_DEEP)
+        return sleep_supported();
+    return true;
+}
+static bool isSel(int i) { return ROWS[i].type != R_HEAD && isShown(i); }
 static bool isDrill(int t)
 {
     return t == R_LAYOUT || t == R_PROV || t == R_FACTORY;
@@ -72,6 +84,16 @@ static String valueStr(JsonDocument &app, int type)
         return FLOW_LBL[(app["config"]["scroll_mode"] | 2) % 3];
     case R_STATUS:
         return app["config"]["statusbar_hidden"].as<bool>() ? "Hidden" : "Shown";
+    case R_SLEEP:
+    case R_DEEP:
+    {
+        int s = (type == R_SLEEP) ? sleep_light_sec() : sleep_deep_sec();
+        if (s <= 0)
+            return "Off";
+        if (s < 60)
+            return String(s) + "s";
+        return String(s / 60) + " min";
+    }
     case R_IDLE:
     {
         int s = idle_timeout_sec();
@@ -109,6 +131,26 @@ static void cycle(JsonDocument &app, int type, int dir)
     case R_STATUS:
         app["config"]["statusbar_hidden"] = !app["config"]["statusbar_hidden"].as<bool>();
         break;
+    case R_SLEEP:
+    case R_DEEP:
+    {
+        // Sleep naps (RAM kept, resumes instantly); Shut down saves and powers
+        // off, coming back at the same caret on the next keypress. Longer
+        // ladders than Power save - these interrupt more than a refresh change.
+        static const int LIGHT[] = {0, 120, 300, 600};
+        static const int DEEP[] = {0, 900, 1800, 3600};
+        const int *steps = (type == R_SLEEP) ? LIGHT : DEEP;
+        const char *key = (type == R_SLEEP) ? "sleep_light_secs" : "sleep_deep_secs";
+        int cur = (type == R_SLEEP) ? sleep_light_sec() : sleep_deep_sec();
+        const int n = 4;
+        int at = 0;
+        for (int i = 0; i < n; i++)
+            if (steps[i] == cur)
+                at = i;
+        at = (at + (dir > 0 ? 1 : n - 1)) % n;
+        app["config"][key] = steps[at];
+        break;
+    }
     case R_IDLE:
     {
         // Off, then a short ladder. After this many seconds without a keystroke
@@ -153,6 +195,8 @@ static const int TOP = 34, FOOT = 292, ITEM_H = 25, HEAD_GAP = 8;
 
 static int rowHeight(int i)
 {
+    if (!isShown(i))
+        return 0; // hidden row takes no space in the scroll window either
     if (ROWS[i].type != R_HEAD)
         return ITEM_H;
     // a section is just a rule now, so it needs the gap around it, not a text line
@@ -208,6 +252,9 @@ void Preferences_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u
         if (y + h > FOOT)
             break;
         const PRow &row = ROWS[i];
+
+        if (!isShown(i))
+            continue; // hidden (sleep rows on a board nothing can wake)
 
         if (row.type == R_HEAD)
         {
