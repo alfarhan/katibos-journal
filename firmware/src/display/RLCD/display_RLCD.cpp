@@ -230,49 +230,42 @@ static int rlcd_wordcount()
            app["config"][format("wordcount_buffer_%d", i)].as<int>();
 }
 
-// Two states, deliberately different at a glance so you can tell across the room
-// whether the machine is merely resting or actually asleep.
-//   resting  a quiet card: what you were writing and how far you got
-//   asleep   the device mark and nothing else
+// The rest screen: the deck mark with كاتب on its screen, beside what you were
+// writing and how far you got. One design for both states - the mark says which
+// machine this is, the numbers say where you left off - with only the closing
+// line differing, since a nap needs a key and a shut down needs the same key but
+// pays a boot for it.
+//
+// Mark left, text right: the same arrangement the About screen uses, so the two
+// read as the same family.
 static void rlcd_draw_rest(bool asleep)
 {
     JsonDocument &app = status();
     display.clearDisplay();
 
-    if (asleep)
-    {
-        // The deck mark, centred, with كاتب on its screen - the same face the
-        // About screen wears, so a sleeping device still looks like this one.
-        const int x = 158, y = 96;
-        display.drawRectangle(x, y, x + 84, y + 104, 1);
-        display.drawRectangle(x + 1, y + 1, x + 83, y + 103, 1);
-        display.drawRectangle(x + 13, y + 13, x + 71, y + 61, 1);
-        RLCD_drawShapedLabel(&u8g2, x + 22, y + 40, "كاتب", true);
-        display.drawFilledRectangle(x + 20, y + 72, x + 64, y + 77, 1);
-        display.drawFilledRectangle(x + 12, y + 86, x + 72, y + 92, 1);
+    // ---- the deck, drawn as a mark ----
+    const int mx = 44, my = 84;
+    display.drawRectangle(mx, my, mx + 84, my + 104, 1);
+    display.drawRectangle(mx + 1, my + 1, mx + 83, my + 103, 1);
+    display.drawRectangle(mx + 13, my + 13, mx + 71, my + 61, 1);
+    RLCD_drawShapedLabel(&u8g2, mx + 22, my + 40, "كاتب", true);
+    display.drawFilledRectangle(mx + 20, my + 72, mx + 64, my + 77, 1);
+    display.drawFilledRectangle(mx + 12, my + 86, mx + 72, my + 92, 1);
 
-        u8g2.setFont(u8g2_font_profont17_tf);
-        const char *msg = "Press any key";
-        u8g2.setCursor((400 - u8g2.getUTF8Width(msg)) / 2, 232);
-        u8g2.print(msg);
-        display.display();
-        return;
-    }
+    // ---- what you were writing ----
+    const int tx = 156;
+    int idx = app["config"]["file_index"].as<int>();
 
-    // resting: the title, the count, and how to get back
-    RLCD_drawWindow(&display, &u8g2, 40, 88, 320, 124, nullptr);
-
-    String title = app["config"][format("title_%d", app["config"]["file_index"].as<int>())].as<String>();
+    String title = app["config"][format("title_%d", idx)].as<String>();
     title.trim();
     if (title.isEmpty() || title == "null")
         title = "Untitled";
     u8g2.setFont(u8g2_font_profont17_tf);
-    int tw = RLCD_shapedLabelWidth(&u8g2, capUtf8(title, 26).c_str(), false);
-    RLCD_drawShapedLabel(&u8g2, (400 - tw) / 2, 124, capUtf8(title, 26).c_str(), false);
+    RLCD_drawShapedLabel(&u8g2, tx, my + 34, capUtf8(title, 20).c_str(), false);
 
-    String count = String(rlcd_wordcount()) + " words";
     u8g2.setFont(u8g2_font_profont22_mf);
-    u8g2.setCursor((400 - u8g2.getUTF8Width(count.c_str())) / 2, 164);
+    String count = String(rlcd_wordcount()) + " words";
+    u8g2.setCursor(tx, my + 70);
     u8g2.print(count.c_str());
 
     u8g2.setFont(u8g2_font_profont17_tf);
@@ -280,15 +273,17 @@ static void rlcd_draw_rest(bool asleep)
     int pct = battery_percent();
     if (pct >= 0)
     {
-        String b = String(pct) + "%";
-        u8g2.setCursor((400 - u8g2.getUTF8Width(b.c_str())) / 2, 192);
+        String b = String(pct) + "% battery";
+        u8g2.setCursor(tx, my + 98);
         u8g2.print(b.c_str());
     }
 #endif
 
-    const char *hint = "Any key to carry on";
-    u8g2.setCursor((400 - u8g2.getUTF8Width(hint)) / 2, 240);
+    // ---- the way back ----
+    const char *hint = asleep ? "Press any key" : "Any key to carry on";
+    u8g2.setCursor((400 - u8g2.getUTF8Width(hint)) / 2, 254);
     u8g2.print(hint);
+
     display.display();
 }
 
