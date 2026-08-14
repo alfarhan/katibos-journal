@@ -134,12 +134,20 @@ static JsonDocument g_remote;       // {status, files:[{id,name,modified,size}]}
 static bool g_haveRemote = false;   // true once a listing has actually been fetched
 static String g_pushedNames[SLOT_MAX];
 static int g_pushedN = 0;
+static bool was_trashed(const String &idOrPath); // defined with the engine state below
 static bool name_taken(const String &nameTxt, const String &selfId)
 {
     if (g_haveRemote)
         for (JsonVariant v : g_remote["files"].as<JsonArray>())
-            if (v["name"].as<String>() == nameTxt && v["id"].as<String>() != selfId)
+        {
+            String id = v["id"].as<String>();
+            // A file trashed earlier in THIS run is still in the (pre-delete)
+            // listing - it no longer holds its name.
+            if (was_trashed(id))
+                continue;
+            if (v["name"].as<String>() == nameTxt && id != selfId)
                 return true;
+        }
     for (int i = 0; i < g_pushedN; i++)
         if (g_pushedNames[i] == nameTxt)
             return true;
@@ -289,10 +297,10 @@ static bool g_allowOpenPull = false; // permit pulling the currently-open file
 static String g_trashed[SLOT_MAX]; // ids trashed this run (don't re-pull from the stale listing)
 static int g_trashedN = 0;
 
-static bool was_trashed(const String &id)
+static bool was_trashed(const String &idOrPath)
 {
     for (int i = 0; i < g_trashedN; i++)
-        if (g_trashed[i] == id)
+        if (g_trashed[i] == idOrPath)
             return true;
     return false;
 }
@@ -464,6 +472,7 @@ static void reconcile_slot(JsonDocument &app, int idx)
         {
             app["config"][format("synced_modified_%d", idx)] = rmod;
             app["config"][format("synced_title_%d", idx)] = title_from_name(rname);
+            g_ok++; // already in sync - see the git backend's note on the count
         }
     }
     else
@@ -701,6 +710,12 @@ static bool gh_path_taken(const String &path, const String &selfPath)
 {
     if (path == selfPath)
         return false;
+    // Staged for deletion in the very commit we're building (a tombstone from a
+    // file deleted on the device). It's still in the pre-delete listing, but the
+    // name IS free - without this a note created after deleting one with the
+    // same title gets a "-N" suffix baked into its title forever.
+    if (was_trashed(path))
+        return false;
     if (g_haveRemote)
         for (JsonVariant v : g_remote["files"].as<JsonArray>())
             if (v["path"].as<String>() == path)
@@ -855,13 +870,23 @@ static bool gh_flush(JsonDocument &app)
                 add["type"] = "blob";
                 add["sha"] = g_pend[i].blobSha;
             }
+            // Delete the rename source / tombstoned path - unless another staged
+            // entry WRITES that same path in this commit (a note created with the
+            // title of one just deleted). A tree may not both add and delete a
+            // path; the add wins, so drop the delete.
             if (!g_pend[i].oldPath.isEmpty())
             {
-                JsonObject del = arr.add<JsonObject>();
-                del["path"] = g_pend[i].oldPath;
-                del["mode"] = "100644";
-                del["type"] = "blob";
-                del["sha"] = static_cast<const char *>(nullptr); // null => delete
+                bool rewritten = false;
+                for (int j = 0; j < g_pendN && !rewritten; j++)
+                    rewritten = (g_pend[j].newPath == g_pend[i].oldPath);
+                if (!rewritten)
+                {
+                    JsonObject del = arr.add<JsonObject>();
+                    del["path"] = g_pend[i].oldPath;
+                    del["mode"] = "100644";
+                    del["type"] = "blob";
+                    del["sha"] = static_cast<const char *>(nullptr); // null => delete
+                }
             }
         }
         String body;
@@ -1144,7 +1169,12 @@ static void gh_reconcile_slot(JsonDocument &app, int idx)
             if (gh_push_slot(app, idx))
                 g_ok++;
         }
-        // else: in sync, nothing to do.
+        else
+        {
+            // already in sync - still counts towards "Synced X of Y", otherwise a
+            // pass with nothing to do reports "Synced 0 of N" and reads as a failure.
+            g_ok++;
+        }
     }
     else
     {
@@ -1173,6 +1203,27 @@ static void gh_reconcile_slot(JsonDocument &app, int idx)
     }
 }
 
+// An empty slot with no remote copy yet has nothing to sync and nothing to
+// reconcile against: the push path refuses a zero-byte file, so counting it just
+// reports a phantom failure ("Synced 0 of 2") on every pass. Deleting the last
+// file leaves exactly such a slot behind - Clear repoints the editor at /0.txt,
+// which loadFile then creates empty. A slot that IS mapped remotely stays in the
+// set so remote deletes and pulls are still honoured.
+static bool slot_has_nothing_to_sync(JsonDocument &app, int i, bool isGit)
+{
+    File f = gfs()->open(format("/%d.txt", i).c_str(), "r");
+    if (!f)
+        return false;
+    long sz = (long)f.size();
+    f.close();
+    if (sz > 0)
+        return false;
+
+    String mapped = isGit ? app["config"][format("gh_path_%d", i)].as<String>()
+                          : app["config"][format("drive_id_%d", i)].as<String>();
+    return mapped.isEmpty() || mapped == "null";
+}
+
 void sync_begin(JsonDocument &app, const String &baseUrl)
 {
     g_scopeOne = false;
@@ -1185,7 +1236,8 @@ void sync_begin(JsonDocument &app, const String &baseUrl)
 
     g_localN = 0;
     for (int i = 0; i < SLOT_MAX; i++)
-        if (gfs()->exists(format("/%d.txt", i).c_str()))
+        if (gfs()->exists(format("/%d.txt", i).c_str()) &&
+            !slot_has_nothing_to_sync(app, i, g_isGit))
             g_local[g_localN++] = i;
 
     g_active = true;
@@ -1244,8 +1296,8 @@ bool sync_step(JsonDocument &app)
                             g_trashed[g_trashedN++] = p; // don't re-pull below
                     }
                     g_curT++;
-                    if (g_curT >= n)
-                        app["config"].remove("sync_trash_git"); // all processed
+                    // NOT retired here - the delete only exists as a staged tree
+                    // entry until gh_flush commits it (see below).
                     return true;
                 }
             }
@@ -1285,14 +1337,21 @@ bool sync_step(JsonDocument &app)
         }
 
         // all slots reconciled — commit every staged change in ONE commit.
+        bool committed = true;
         if (g_pendN > 0)
         {
             app["sync_message"] = format("Saving %d change(s) ...", g_pendN);
             app["sync_state"] = SYNC_PROGRESS;
             app["clear"] = true;
-            gh_flush(app);
+            committed = gh_flush(app);
             g_pendN = 0; // consumed (success applied state; failure set sync_error)
         }
+
+        // Retire the device-side tombstones only once their delete actually
+        // landed. A failed flush leaves them in config so the next sync retries;
+        // dropping them here would strand the remote copies forever.
+        if (committed && g_curT > 0)
+            app["config"].remove("sync_trash_git");
 
         g_active = false;
         return false;

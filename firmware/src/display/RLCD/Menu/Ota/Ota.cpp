@@ -98,11 +98,19 @@ void Ota_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
     drawScreen(display, u8);
 
-    // deferred blocking work (one frame after the message is shown)
-    if (pending && settle > 0)
+    // Deferred blocking work, one frame after the message is shown. Menu_render
+    // only runs a sub-screen when something marked the menu dirty, and while we
+    // are waiting on our own settle counter nothing else will - so keep it dirty
+    // until the work actually starts. Without this the screen sat on
+    // "Connecting..." until an unrelated keypress happened to trigger a render.
+    if (pending)
     {
-        settle--;
-        return;
+        Menu_clear();
+        if (settle > 0)
+        {
+            settle--;
+            return;
+        }
     }
     if (pending == 1)
     {

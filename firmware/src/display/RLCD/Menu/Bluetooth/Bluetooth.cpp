@@ -49,7 +49,7 @@ void Bluetooth_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
     u8->setCursor(10, 74);
     u8->print("FOUND KEYBOARDS:");
-    RLCD_drawScrollbar(display, 384, 84, 286, page * BT_PER_PAGE, BT_PER_PAGE, count);
+    RLCD_drawScrollbar(display, 384, 84, 266, page * BT_PER_PAGE, BT_PER_PAGE, count);
 
     if (count == 0)
     {
@@ -83,7 +83,14 @@ void Bluetooth_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         }
     }
 
-
+    // Footer key legend - this screen is the only place the pairing keys exist,
+    // so it has to say what they are. Same footer as Sync / Update.
+    static const RLCD_Hint HINTS[] = {
+        {"ENT", "PAIR"}, {"R", "SCAN"}, {"F", "FORGET"}, {"ESC", "BACK"}};
+    u8->setFont(u8g2_font_profont17_tf);
+    display->drawLine(0, 276, 400, 276, 1);
+    RLCD_drawHintBar(display, u8, (400 - RLCD_hintBarWidth(u8, RLCD_HINTS(HINTS))) / 2, 296,
+                     RLCD_HINTS(HINTS));
 }
 
 void Bluetooth_keyboard(int key)

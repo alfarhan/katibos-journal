@@ -10,6 +10,24 @@
 #include "display/RLCD/display_RLCD.h"
 #include "display/RLCD/Menu/FileList/Pagination.h"
 
+// Footer key legend, shared by all four Wi-Fi sub-screens: a divider then the
+// hints centered under it, the same footer Sync and Update use. These screens are
+// the only place the network keys exist, so they have to say what they are.
+#define WIFI_HINTS(a) (a), (int)(sizeof(a) / sizeof((a)[0]))
+static const RLCD_Hint LIST_HINTS[] = {{"ENT", "OPEN"}, {"N", "ADD"}, {"S", "SCAN"}, {"ESC", "BACK"}};
+static const RLCD_Hint SCAN_HINTS[] = {{"ENT", "JOIN"}, {"R", "RESCAN"}, {"ESC", "BACK"}};
+static const RLCD_Hint ENTRY_HINTS[] = {{"ENT", "EDIT"}, {"F", "FORGET"}, {"ESC", "BACK"}};
+static const RLCD_Hint EDIT_HINTS[] = {{"ENT", "NEXT"}, {"ESC", "CANCEL"}};
+static const RLCD_Hint SAVE_HINTS[] = {{"ENT", "SAVE"}, {"ESC", "CANCEL"}};
+
+static void Wifi_drawHints(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8,
+                           const RLCD_Hint *hints, int n)
+{
+    u8->setFont(u8g2_font_profont17_tf);
+    display->drawLine(0, 276, 400, 276, 1);
+    RLCD_drawHintBar(display, u8, (400 - RLCD_hintBarWidth(u8, hints, n)) / 2, 296, hints, n);
+}
+
 //
 void Wifi_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
@@ -78,7 +96,7 @@ void Wifi_render_entry(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8
     u8->setCursor(120, 178);
     u8->print("Forget this network");
 
-
+    Wifi_drawHints(display, u8, WIFI_HINTS(ENTRY_HINTS));
 }
 
 //
@@ -101,7 +119,7 @@ void Wifi_render_list(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     u8->setFont(u8g2_font_profont17_tf);
     u8->setCursor(10, 46);
     u8->print("SAVED NETWORKS:");
-    RLCD_drawScrollbar(display, 384, 56, 286, page * WIFI_PER_PAGE, WIFI_PER_PAGE, count);
+    RLCD_drawScrollbar(display, 384, 56, 266, page * WIFI_PER_PAGE, WIFI_PER_PAGE, count);
 
     if (count == 0)
     {
@@ -135,7 +153,7 @@ void Wifi_render_list(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         }
     }
 
-
+    Wifi_drawHints(display, u8, WIFI_HINTS(LIST_HINTS));
 }
 
 // Four signal bars of rising height, filled to the strength level (RSSI dBm).
@@ -186,7 +204,7 @@ void Wifi_render_scan(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
     u8->setCursor(10, 46);
     u8->print("NEARBY NETWORKS:");
-    RLCD_drawScrollbar(display, 384, 56, 286, page * WIFI_PER_PAGE, WIFI_PER_PAGE, count);
+    RLCD_drawScrollbar(display, 384, 56, 266, page * WIFI_PER_PAGE, WIFI_PER_PAGE, count);
 
     if (count == 0)
     {
@@ -222,7 +240,7 @@ void Wifi_render_scan(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         }
     }
 
-
+    Wifi_drawHints(display, u8, WIFI_HINTS(SCAN_HINTS));
 }
 
 void Wifi_render_edit(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
@@ -231,30 +249,33 @@ void Wifi_render_edit(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     JsonDocument &app = status();
     int wifi_config_index = app["wifi_config_index"].as<int>();
     int wifi_config_status = app["wifi_config_status"].as<int>();
+    bool ssidStep = (wifi_config_status == WIFI_CONFIG_EDIT_SSID);
 
-    u8->printf(" EDIT [%d] WIFI CONFIG", wifi_config_index + 1);
-    u8->println("");
+    u8->setFont(u8g2_font_profont17_tf);
+    u8->setCursor(10, 62);
+    u8->printf("NETWORK [%d] - %s", wifi_config_index + 1,
+               ssidStep ? "NAME" : "PASSWORD");
 
-    if (wifi_config_status == WIFI_CONFIG_EDIT_SSID)
-    {
-        u8->println(" TYPE SSID:");
-        u8->println("");
+    u8->setCursor(10, 90);
+    u8->print(ssidStep ? "Type the network name:" : "Type the password:");
 
-        u8->printf("      %s", buffer_get());
-        u8->println("");
-        u8->println("");
-        u8->println(" [ENTER] NEXT ");
-    }
-    else if (wifi_config_status == WIFI_CONFIG_EDIT_KEY)
-    {
-        u8->println(" TYPE WIFI KEY:");
-        u8->println("");
+    // what's been typed so far, in the same inverse bar the entry screen uses
+    display->drawFilledRectangle(8, 108, 392, 130, 1);
+    u8->setForegroundColor(ST7305_COLOR_WHITE);
+    u8->setBackgroundColor(ST7305_COLOR_BLACK);
+    u8->setCursor(16, 125);
+    u8->print(buffer_get());
+    u8->setForegroundColor(ST7305_COLOR_BLACK);
+    u8->setBackgroundColor(ST7305_COLOR_WHITE);
 
-        u8->printf("      %s", buffer_get());
-        u8->println("");
-        u8->println("");
-        u8->println(" [ENTER] SAVE ");
-    }
+    u8->setCursor(10, 160);
+    u8->print(ssidStep ? "Enter goes on to the password."
+                       : "Enter saves this network.");
+
+    if (ssidStep)
+        Wifi_drawHints(display, u8, WIFI_HINTS(EDIT_HINTS));
+    else
+        Wifi_drawHints(display, u8, WIFI_HINTS(SAVE_HINTS));
 }
 
 

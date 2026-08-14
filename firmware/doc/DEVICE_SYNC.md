@@ -180,6 +180,26 @@ after the source side syncs *and* the other side syncs.
 | Sync list fetch fails (WiFi drop) | No deletes honored — safe, never wipes. |
 | Untitled note on rev8 | Pushed under a timestamp name; tracked by id after first sync. |
 | Rename AND edit done with Obsidian closed | Obsidian side may create a duplicate (rename tracking is live-only) — known limit. |
-| Empty file on rev8 | Never uploaded (skipped). |
+| Empty file on rev8 | Never uploaded, and left out of the sync set entirely when it has no remote copy yet — otherwise every pass reports a phantom "Synced 0 of N". Deleting the last file leaves exactly such a slot (Clear repoints the editor at `/0.txt`, which `loadFile` creates empty). |
 
 Both clients are manual; every destructive op lands in a recoverable bin (never a hard delete).
+
+## GitHub backend (`config.sync.provider == "git"`) — invariants
+
+Push is batched: each changed slot uploads a blob and stages a `GhPending`, then
+`gh_flush()` turns the whole set into **one commit** (tree → commit → ref).
+Three ordering rules the code depends on, each of which was a bug first:
+
+- **A tombstoned path is a FREE name.** Phase T stages the deletes for files
+  removed on the device, but the listing it matches against was fetched *before*
+  the commit, so those paths are still in it. `gh_path_taken()` therefore ignores
+  anything in `g_trashed` — otherwise a note created after deleting one with the
+  same title got a `-N` suffix baked permanently into its title (`title_manual`).
+- **A tree may not both add and delete the same path.** When the freed name is
+  reused in the same commit, `gh_flush()` drops the delete entry; the add wins.
+- **Tombstones are retired only after the commit lands.** `sync_trash_git` stays
+  in config until `gh_flush()` returns true, so a failed commit is retried next
+  sync instead of stranding the remote copies forever.
+
+"Synced X of Y" counts slots that *ended up* in sync, including ones that needed
+no work — a pass with nothing to do reports Y of Y, not 0 of Y.

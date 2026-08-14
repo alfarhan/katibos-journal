@@ -27,6 +27,17 @@ static void setState(int s, const String &msg)
     app["clear"] = true;
 }
 
+// Stage label during the blocking download: no render tick runs while
+// ota_apply() holds the loop, so each step has to push its own repaint.
+static void setStage(const String &msg, int progress)
+{
+    JsonDocument &app = status();
+    app["ota_message"] = msg;
+    app["ota_progress"] = progress;
+    if (g_redraw)
+        g_redraw();
+}
+
 // Bring Wi-Fi up with a saved credential. The emulator's HTTP transport is
 // libcurl, so it needs no radio.
 static bool ota_ensure_wifi()
@@ -138,17 +149,17 @@ void ota_apply()
     {
         const char *s = getenv("EMU_OTA_STALL");
         int stall = s ? atoi(s) : -1;
+        setStage("Connecting...", -1);
+        setStage("Preparing storage...", -1);
         for (int p = 0; p <= 100; p += 5)
         {
-            app["ota_progress"] = p;
-            app["ota_message"] = format("Installing... %d%%", p);
-            if (g_redraw)
-                g_redraw();
+            setStage(format("Downloading... %d%%", p), p);
             if (stall >= 0 && p >= stall)
                 return;
         }
+        setStage("Installing...", 100);
     }
-    setState(OTA_DONE, "Updated (simulated)");
+    setState(OTA_DONE, "Updated (simulated) - press ENT to restart");
 #else
     // Free the persistent sync TLS connection first so mbedTLS has enough heap
     // for this download's own secure client (two live TLS contexts starve it).
@@ -168,6 +179,9 @@ void ota_apply()
     int code = 0;
     for (int hop = 0; hop < 5; hop++)
     {
+        // The TLS handshake plus GitHub's cross-host redirect is the slowest
+        // silent stretch of the whole update, so name what it's doing.
+        setStage(hop == 0 ? "Connecting..." : "Redirecting...", -1);
         http.begin(client, url);
         http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
         const char *collect[] = {"Location"};
@@ -203,6 +217,7 @@ void ota_apply()
         setState(OTA_ERROR, "Unknown firmware size");
         return;
     }
+    setStage("Preparing storage...", -1);
     if (!Update.begin(len))
     {
         http.end();
@@ -220,13 +235,13 @@ void ota_apply()
         lastPct = pct;
         if (pct % 10 == 0)
             _log("[ota] %d%%\n", pct);
-        JsonDocument &app = status();
-        app["ota_progress"] = pct;
-        app["ota_message"] = format("Installing... %d%%", pct);
-        if (g_redraw)
-            g_redraw();
+        // Named "Downloading" because the network is what the percentage is
+        // pacing - writeStream flashes each chunk as it arrives, so there is no
+        // separate download-then-write phase to show.
+        setStage(format("Downloading... %d%%", pct), pct);
     });
 
+    setStage("Downloading... 0%", 0);
     WiFiClient *stream = http.getStreamPtr();
     size_t written = Update.writeStream(*stream);
     http.end();
@@ -238,12 +253,15 @@ void ota_apply()
         setState(OTA_ERROR, "Download incomplete");
         return;
     }
+    // Update.end verifies the image and switches the boot partition - a real
+    // step of its own, and the last thing standing between here and a reboot.
+    setStage("Installing...", 100);
     if (!Update.end(true))
     {
         setState(OTA_ERROR, "Install failed");
         return;
     }
-    setState(OTA_DONE, "Update installed");
+    setState(OTA_DONE, "Update installed - press ENT to restart");
 #endif
 }
 
