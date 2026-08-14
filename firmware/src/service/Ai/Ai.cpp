@@ -92,7 +92,15 @@ static bool ai_ensure_wifi(JsonDocument &app)
             {
                 String pw = ap["password"].as<String>();
                 if (sync_connect_wifi(app, ssid.c_str(), pw.c_str()))
+                {
+                    // Association is not readiness - DHCP and DNS land a moment
+                    // later, and a TLS connect attempted too early fails with
+                    // start_ssl_client: -1. sync_start() waits here for the same
+                    // reason; this path was missing it.
+                    delay(1500);
+                    _log("[ai] wifi ready, IP %s\n", WiFi.localIP().toString().c_str());
                     return true;
+                }
             }
     }
     return false;
@@ -229,10 +237,42 @@ static void ai_run()
     headers.push_back("Content-Type: application/json");
     headers.push_back("x-goog-api-key: " + app["config"]["ai"]["key"].as<String>());
 
-    SyncHttp r = sync_http("POST", url, headers, payload);
+    // Free the sync path's persistent TLS client first. It is a STATIC
+    // WiFiClientSecure kept alive with setReuse(true), so after any sync it still
+    // holds a connection to another host plus ~40KB of mbedTLS context - enough
+    // to make this handshake fail with start_ssl_client: -1. The OTA download
+    // does exactly this for the same reason.
+    sync_http_close();
+#ifndef HOST_EMU
+    _log("[ai] free heap before request: %u\n", (unsigned)ESP.getFreeHeap());
+#endif
+
+    // 90s: a "pro" model proofreading a few KB of Arabic takes far longer than
+    // the transport's 5s default, which showed up as -11 (READ_TIMEOUT) with the
+    // request already sent and Gemini still composing.
+    SyncHttp r = sync_http("POST", url, headers, payload, AI_TIMEOUT_MS);
+
+    // A -1 is a transport/handshake failure, not an answer. Retry once with a
+    // fully torn-down client: the first handshake often fails right after the
+    // radio associates, and a second attempt costs a few seconds against losing
+    // the whole pass.
+    if (r.code <= 0)
+    {
+        _log("[ai] transport failed (%d) - retrying once\n", r.code);
+        aiStage("Retrying ...");
+        sync_http_close();
+        delay(1500);
+        r = sync_http("POST", url, headers, payload, AI_TIMEOUT_MS);
+    }
+
     payload = ""; // free the request before parsing the reply
     ai_wifi_done();
 
+    if (r.code <= 0)
+    {
+        aiFail("Could not reach the AI (TLS failed) - text unchanged");
+        return;
+    }
     if (r.code < 200 || r.code >= 400)
     {
         aiFail(format("AI request failed (HTTP %d)", r.code));

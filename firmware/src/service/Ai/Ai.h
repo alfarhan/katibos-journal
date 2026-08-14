@@ -24,6 +24,11 @@
 // Refuse a document larger than this (request + reply must both fit).
 static const long AI_MAX_BYTES = 24 * 1024;
 
+// How long to wait for the model. Generous on purpose: this call generates text,
+// so it is nothing like the instant API calls the sync path makes, and the
+// transport's 5s default cuts it off mid-reply (-11 READ_TIMEOUT).
+static const unsigned long AI_TIMEOUT_MS = 90000;
+
 // True when config.ai.key is present, i.e. the feature is usable at all.
 bool ai_configured(JsonDocument &app);
 

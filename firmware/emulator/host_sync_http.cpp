@@ -67,7 +67,8 @@ SyncHttp sync_http_get(const String &url)
 // connection to api.github.com is reused instead of re-handshaken every call
 // (a history-preserving rename is 5-6 calls). Mirrors the device's setReuse.
 SyncHttp sync_http(const String &method, const String &url,
-                   const std::vector<String> &headers, const String &body)
+                   const std::vector<String> &headers, const String &body,
+                   unsigned long timeoutMs)
 {
     static CURL *c = nullptr;
     if (!c)
@@ -89,7 +90,7 @@ SyncHttp sync_http(const String &method, const String &url,
     curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, &resp);
-    curl_easy_setopt(c, CURLOPT_TIMEOUT, 60L);
+    curl_easy_setopt(c, CURLOPT_TIMEOUT, timeoutMs ? (long)(timeoutMs / 1000) : 60L);
     curl_easy_setopt(c, CURLOPT_CUSTOMREQUEST, method.c_str());
     if (hdrs)
         curl_easy_setopt(c, CURLOPT_HTTPHEADER, hdrs);

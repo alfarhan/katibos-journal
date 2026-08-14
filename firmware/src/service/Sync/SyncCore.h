@@ -29,8 +29,12 @@ SyncHttp sync_http_post_file(const String &url, const String &filePath);
 
 // General request used by the GitHub backend: arbitrary method, custom headers
 // (each "Name: value"), and an in-memory body. Follows redirects.
+// timeoutMs 0 keeps the transport default (5s on device) - fine for the chatty,
+// fast git calls. Pass a real value for anything that thinks before replying:
+// an AI generateContent call routinely needs tens of seconds.
 SyncHttp sync_http(const String &method, const String &url,
-                   const std::vector<String> &headers, const String &body);
+                   const std::vector<String> &headers, const String &body,
+                   unsigned long timeoutMs = 0);
 
 // ---- backend selection -----------------------------------------------------
 // True when config.sync.provider == "git" (default "drive").

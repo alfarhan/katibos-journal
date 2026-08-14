@@ -328,7 +328,8 @@ void sync_http_close()
 }
 
 SyncHttp sync_http(const String &method, const String &url,
-                   const std::vector<String> &headers, const String &body)
+                   const std::vector<String> &headers, const String &body,
+                   unsigned long timeoutMs)
 {
     if (!s_syncClientInit)
     {
@@ -339,6 +340,15 @@ SyncHttp sync_http(const String &method, const String &url,
     HTTPClient http;
     http.begin(s_syncClient, url);
     http.setReuse(true); // keep the connection open for the next call
+    if (timeoutMs)
+    {
+        // The default 5s read timeout is right for API calls that answer at once
+        // and wrong for one that generates text - it returned -11 (READ_TIMEOUT)
+        // while Gemini was still composing the reply.
+        http.setTimeout(timeoutMs);
+        http.setConnectTimeout(timeoutMs);
+        s_syncClient.setTimeout(timeoutMs / 1000);
+    }
     http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
     for (const String &h : headers)
     {
