@@ -136,118 +136,112 @@ static void drawKeyedLabel(ST7305_4p2_BW_DisplayDriver *d, U8G2_FOR_ST73XX *u8,
 }
 
 // ---- card icons -----------------------------------------------------------
-// Each draws inside a 28x28 box at (x,y) in `ink`, so a focused (inverted) card
-// gets the same shape in white. Line art only - no glyph, no font dependency.
+// Each is drawn on a 28-unit grid and scaled to whatever box it is given, so the
+// same mark serves the roomy grid and the narrow column beside the file list.
+// Line art only - no glyph, no font dependency - and everything is drawn in
+// `ink`, so a focused (inverted) card gets the same shape in white.
+#define S(v) ((v) * sz / 28)
 
-static void iconPrefs(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+static void iconPrefs(ST7305_4p2_BW_DisplayDriver *d, int x, int y, int sz, uint16_t ink)
 {
-    // three sliders, knobs at different positions
     for (int i = 0; i < 3; i++)
     {
-        int ly = y + 6 + i * 8;
-        d->drawLine(x + 2, ly, x + 26, ly, ink);
-        d->drawFilledRectangle(x + 4 + i * 8, ly - 3, x + 9 + i * 8, ly + 3, ink);
+        int ly = y + S(6 + i * 8);
+        d->drawLine(x + S(2), ly, x + S(26), ly, ink);
+        d->drawFilledRectangle(x + S(4 + i * 8), ly - S(3), x + S(9 + i * 8), ly + S(3), ink);
     }
 }
 
-static void iconWifi(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+static void iconWifi(ST7305_4p2_BW_DisplayDriver *d, int x, int y, int sz, uint16_t ink)
 {
-    // three widening arcs over a dot
     for (int i = 0; i < 3; i++)
     {
-        int s = 4 + i * 5;
-        d->drawLine(x + 14 - s, y + 16 - s / 2, x + 14, y + 10 - s, ink);
-        d->drawLine(x + 14, y + 10 - s, x + 14 + s, y + 16 - s / 2, ink);
+        int a = 4 + i * 5;
+        d->drawLine(x + S(14 - a), y + S(16 - a / 2), x + S(14), y + S(10 - a), ink);
+        d->drawLine(x + S(14), y + S(10 - a), x + S(14 + a), y + S(16 - a / 2), ink);
     }
-    d->drawFilledRectangle(x + 12, y + 20, x + 16, y + 24, ink);
+    d->drawFilledRectangle(x + S(12), y + S(20), x + S(16), y + S(24), ink);
 }
 
-static void iconSync(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+static void iconSync(ST7305_4p2_BW_DisplayDriver *d, int x, int y, int sz, uint16_t ink)
 {
-    // two arrows chasing each other
-    d->drawLine(x + 4, y + 9, x + 24, y + 9, ink);
-    d->drawFilledTriangle(x + 24, y + 4, x + 24, y + 14, x + 28, y + 9, ink);
-    d->drawLine(x + 4, y + 19, x + 24, y + 19, ink);
-    d->drawFilledTriangle(x + 4, y + 14, x + 4, y + 24, x, y + 19, ink);
+    d->drawLine(x + S(4), y + S(9), x + S(24), y + S(9), ink);
+    d->drawFilledTriangle(x + S(24), y + S(4), x + S(24), y + S(14), x + S(28), y + S(9), ink);
+    d->drawLine(x + S(4), y + S(19), x + S(24), y + S(19), ink);
+    d->drawFilledTriangle(x + S(4), y + S(14), x + S(4), y + S(24), x, y + S(19), ink);
 }
 
-static void iconDrive(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+static void iconDrive(ST7305_4p2_BW_DisplayDriver *d, int x, int y, int sz, uint16_t ink)
 {
-    // 3.5" floppy, same mark the Storage panel uses
-    d->drawRectangle(x + 1, y + 1, x + 27, y + 27, ink);
-    d->drawFilledRectangle(x + 8, y + 3, x + 20, y + 11, ink);
-    d->drawFilledRectangle(x + 13, y + 4, x + 16, y + 10, ink);
-    d->drawRectangle(x + 6, y + 16, x + 22, y + 26, ink);
+    d->drawRectangle(x + S(1), y + S(1), x + S(27), y + S(27), ink);
+    d->drawFilledRectangle(x + S(8), y + S(3), x + S(20), y + S(11), ink);
+    d->drawFilledRectangle(x + S(13), y + S(4), x + S(16), y + S(10), ink);
+    d->drawRectangle(x + S(6), y + S(16), x + S(22), y + S(26), ink);
 }
 
-static void iconUpdate(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+static void iconUpdate(ST7305_4p2_BW_DisplayDriver *d, int x, int y, int sz, uint16_t ink)
 {
-    // arrow landing in a tray
-    d->drawLine(x + 14, y + 2, x + 14, y + 14, ink);
-    d->drawFilledTriangle(x + 8, y + 12, x + 20, y + 12, x + 14, y + 20, ink);
-    d->drawLine(x + 4, y + 24, x + 24, y + 24, ink);
-    d->drawLine(x + 4, y + 20, x + 4, y + 24, ink);
-    d->drawLine(x + 24, y + 20, x + 24, y + 24, ink);
+    d->drawLine(x + S(14), y + S(2), x + S(14), y + S(14), ink);
+    d->drawFilledTriangle(x + S(8), y + S(12), x + S(20), y + S(12), x + S(14), y + S(20), ink);
+    d->drawLine(x + S(4), y + S(24), x + S(24), y + S(24), ink);
+    d->drawLine(x + S(4), y + S(20), x + S(4), y + S(24), ink);
+    d->drawLine(x + S(24), y + S(20), x + S(24), y + S(24), ink);
 }
 
 #ifdef USE_BLE_KEYBOARD_HOST
-static void iconKeyboard(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+static void iconKeyboard(ST7305_4p2_BW_DisplayDriver *d, int x, int y, int sz, uint16_t ink)
 {
-    d->drawRectangle(x + 1, y + 6, x + 27, y + 22, ink);
+    d->drawRectangle(x + S(1), y + S(6), x + S(27), y + S(22), ink);
     for (int r = 0; r < 2; r++)
         for (int c = 0; c < 5; c++)
-            d->drawFilledRectangle(x + 5 + c * 4, y + 10 + r * 5, x + 7 + c * 4, y + 12 + r * 5, ink);
+            d->drawFilledRectangle(x + S(5 + c * 4), y + S(10 + r * 5),
+                                   x + S(7 + c * 4), y + S(12 + r * 5), ink);
 }
 #endif
 
-static void iconHelp(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+static void iconHelp(ST7305_4p2_BW_DisplayDriver *d, int x, int y, int sz, uint16_t ink)
 {
-    // question mark, drawn so it inverts with the card like the rest
-    d->drawLine(x + 8, y + 8, x + 10, y + 4, ink);
-    d->drawLine(x + 10, y + 4, x + 18, y + 4, ink);
-    d->drawLine(x + 18, y + 4, x + 20, y + 8, ink);
-    d->drawLine(x + 20, y + 8, x + 14, y + 14, ink);
-    d->drawLine(x + 14, y + 14, x + 14, y + 18, ink);
-    d->drawFilledRectangle(x + 12, y + 22, x + 16, y + 26, ink);
+    d->drawLine(x + S(8), y + S(8), x + S(10), y + S(4), ink);
+    d->drawLine(x + S(10), y + S(4), x + S(18), y + S(4), ink);
+    d->drawLine(x + S(18), y + S(4), x + S(20), y + S(8), ink);
+    d->drawLine(x + S(20), y + S(8), x + S(14), y + S(14), ink);
+    d->drawLine(x + S(14), y + S(14), x + S(14), y + S(18), ink);
+    d->drawFilledRectangle(x + S(12), y + S(22), x + S(16), y + S(26), ink);
 }
 
-// The device itself, the same deck-with-a-screen mark the About screen draws
-// large and the title bar carries small.
-static void iconAbout(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+static void iconAbout(ST7305_4p2_BW_DisplayDriver *d, int x, int y, int sz, uint16_t ink)
 {
-    d->drawRectangle(x + 3, y + 2, x + 25, y + 26, ink);
-    d->drawRectangle(x + 7, y + 6, x + 21, y + 16, ink);   // screen
-    d->drawFilledRectangle(x + 9, y + 20, x + 19, y + 22, ink); // deck
+    d->drawRectangle(x + S(3), y + S(2), x + S(25), y + S(26), ink);
+    d->drawRectangle(x + S(7), y + S(6), x + S(21), y + S(16), ink);
+    d->drawFilledRectangle(x + S(9), y + S(20), x + S(19), y + S(22), ink);
 }
 
-// A circle broken at the top right with an arrowhead on the loose end - the
-// restart mark. drawCircle then a cleared notch, because there is no arc.
-static void iconRestart(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+static void iconRestart(ST7305_4p2_BW_DisplayDriver *d, int x, int y, int sz, uint16_t ink)
 {
-    d->drawCircle(x + 14, y + 15, 9, ink);
-    d->drawCircle(x + 14, y + 15, 8, ink); // 2px stroke, so it reads at this size
-    // knock the gap out of the top-right quadrant
-    d->drawFilledRectangle(x + 14, y + 3, x + 26, y + 9, ink == ST7305_COLOR_WHITE ? ST7305_COLOR_BLACK : ST7305_COLOR_WHITE);
-    d->drawFilledTriangle(x + 12, y + 2, x + 12, y + 10, x + 19, y + 6, ink);
+    d->drawCircle(x + S(14), y + S(15), S(9), ink);
+    if (sz >= 26)
+        d->drawCircle(x + S(14), y + S(15), S(8), ink); // 2px stroke only when big
+    d->drawFilledTriangle(x + S(12), y + S(2), x + S(12), y + S(10), x + S(19), y + S(6), ink);
 }
 
-static void drawActionIcon(ST7305_4p2_BW_DisplayDriver *d, int act, int x, int y, uint16_t ink)
+static void drawActionIcon(ST7305_4p2_BW_DisplayDriver *d, int act, int x, int y, int sz, uint16_t ink)
 {
     switch (act)
     {
-    case ACT_PREFS: iconPrefs(d, x, y, ink); break;
-    case ACT_WIFI: iconWifi(d, x, y, ink); break;
-    case ACT_SYNC: iconSync(d, x, y, ink); break;
+    case ACT_PREFS: iconPrefs(d, x, y, sz, ink); break;
+    case ACT_WIFI: iconWifi(d, x, y, sz, ink); break;
+    case ACT_SYNC: iconSync(d, x, y, sz, ink); break;
 #ifdef USE_BLE_KEYBOARD_HOST
-    case ACT_BTKB: iconKeyboard(d, x, y, ink); break;
+    case ACT_BTKB: iconKeyboard(d, x, y, sz, ink); break;
 #endif
-    case ACT_DRIVE: iconDrive(d, x, y, ink); break;
-    case ACT_UPDATE: iconUpdate(d, x, y, ink); break;
-    case ACT_HELP: iconHelp(d, x, y, ink); break;
-    case ACT_ABOUT: iconAbout(d, x, y, ink); break;
-    case ACT_RESTART: iconRestart(d, x, y, ink); break;
+    case ACT_DRIVE: iconDrive(d, x, y, sz, ink); break;
+    case ACT_UPDATE: iconUpdate(d, x, y, sz, ink); break;
+    case ACT_HELP: iconHelp(d, x, y, sz, ink); break;
+    case ACT_ABOUT: iconAbout(d, x, y, sz, ink); break;
+    case ACT_RESTART: iconRestart(d, x, y, sz, ink); break;
     }
 }
+#undef S
 
 static void dispatch(int act)
 {
@@ -305,6 +299,9 @@ void Settings_openCard(int id) { dispatch(id); }
 void Settings_drawCard(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8,
                        int id, int x, int y, int w, int h, bool focused)
 {
+    // The mark is sized to the card rather than the card to the mark, so a narrow
+    // column keeps its frames instead of having the icon run through them.
+    const int ICON = (h >= 44) ? 28 : (h >= 30 ? 20 : 16);
     RLCD_drawWindow(display, u8, x, y, w, h, nullptr);
     if (focused)
         display->drawFilledRectangle(x + 1, y + 1, x + w - 1, y + h - 1, 1);
@@ -318,15 +315,17 @@ void Settings_drawCard(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8
     u8->setFont(u8g2_font_profont17_tf);
     const char *label = actionLabel(id);
 
-    const int ICON = 28, CAP = 12, GAP = 8;
-    if (h < ICON + CAP + 12)
+    const int CAP = 12, GAP = 8;
+    if (h < 28 + CAP + 12)
     {
         // Short and wide: mark on the left, name beside it, both centred on the
         // card's middle line. This is what lets a card be half as tall - nothing
         // is stacked, so the height only has to clear the icon.
+        // Tight margins: "Preferences" is 98px and the column is 146, so the mark
+        // and the name have about 10px between them and the edges to share.
         int iy = y + (h - ICON) / 2;
-        drawActionIcon(display, id, x + 10, iy, ink);
-        drawKeyedLabel(display, u8, x + 10 + ICON + GAP, y + (h + CAP) / 2, label,
+        drawActionIcon(display, id, x + 8, iy, ICON, ink);
+        drawKeyedLabel(display, u8, x + 8 + ICON + GAP, y + (h + CAP) / 2, label,
                        actionKey(id), ink);
     }
     else
@@ -335,7 +334,7 @@ void Settings_drawCard(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8
         int blockY = (h - (ICON + 6 + CAP)) / 2;
         if (blockY < 2)
             blockY = 2;
-        drawActionIcon(display, id, x + (w - ICON) / 2, y + blockY, ink);
+        drawActionIcon(display, id, x + (w - ICON) / 2, y + blockY, ICON, ink);
         drawKeyedLabel(display, u8, x + (w - u8->getUTF8Width(label)) / 2,
                        y + blockY + ICON + 6 + CAP, label, actionKey(id), ink);
     }

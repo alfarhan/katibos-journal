@@ -26,25 +26,32 @@ static const int HOME_MAX_FILES = 100;
 // 98px and a 4-across card would only be 91 - measured, not guessed.
 static const int LIST_TOP = 52;   // first row baseline
 static const int LIST_PITCH = 22;
-static const int CARD_COLS = 2;   // wide cards: mark left, name right
-static const int CARD_H = 32;     // enough to clear the 28px icon
-static const int CARD_GAP = 4;
+// Side by side: file list left, the cards stacked in a column on the right. Nine
+// cards down 254px of height leaves each 28px - exactly the icon - so they sit
+// edge to edge as one panel rather than nine floating windows.
+static const int SPLIT_X = 238;
+static const int CARD_X = 246;
+static const int CARD_W = 400 - CARD_X - 8;
+static const int CARD_TOP_Y = 38;
 
 // The card block is sized from how many cards this board actually has - a BLE
 // build has nine (Keyboard) and needs a fifth row - and the file list takes
 // whatever is left. Hardcoding either one squashed the icons on one board or
 // wasted a row on the other.
-static int Home_cardRows()
+// Card height falls out of how many this board has; the list simply fills its
+// own column, which is why the split no longer costs it rows.
+static int Home_cardH()
 {
     int ids[16];
     int n = Settings_cards(ids, 16);
-    return (n + CARD_COLS - 1) / CARD_COLS;
+    if (n < 1)
+        n = 1;
+    int h = (292 - CARD_TOP_Y) / n;
+    return h > 34 ? 34 : h;
 }
-static int Home_cardTop() { return 292 - (Home_cardRows() * CARD_H + (Home_cardRows() - 1) * CARD_GAP); }
-static int Home_dividerY() { return Home_cardTop() - 8; }
 static int Home_listRows()
 {
-    int rows = (Home_dividerY() - 6 - LIST_TOP) / LIST_PITCH + 1;
+    int rows = (290 - LIST_TOP) / LIST_PITCH + 1;
     return rows < 1 ? 1 : rows;
 }
 
@@ -187,12 +194,13 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     }
 
     RLCD_drawTitleBar(display, u8, 0, 0, 400, 28, "katibOS  \u0643\u0627\u062a\u0628", 0);
+    display->drawLine(SPLIT_X, 34, SPLIT_X, 292, 1);
 
-    // ---- files, above the rule. No header: the list is the screen's subject,
-    // ---- and the row saved goes to a file instead of a label.
+    // ---- files, left. No header: the list is the subject of the screen, and the
+    // ---- row a header would cost goes to a file instead.
     int page = paginate::pageOf(g_cursor, HOME_PER_PAGE);
     int rows = paginate::rowsOnPage(page, HOME_PER_PAGE, g_count);
-    const int SBX = 378;
+    const int SBX = SPLIT_X - 22;
 
     u8->setFont(u8g2_font_profont17_tf);
     for (int r = 0; r < rows; r++)
@@ -209,23 +217,19 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         }
 
         u8->setCursor(10, y);
-        u8->printf("[%d]  ", idx);
+        u8->printf("[%d] ", idx);
         int tx = u8->getCursorX();
 
-        char cnt[16];
-        snprintf(cnt, sizeof(cnt), "%d w", Home_wordCount(idx));
-        int cntX = SBX - 12 - u8->getUTF8Width(cnt);
-        u8->setCursor(cntX, y);
-        u8->print(cnt);
-
+        // The word count goes: at this width it would eat the title, and the sync
+        // mark is the part you actually scan for.
         bool synced = !app["config"][format("unsynced_%d", idx)].as<bool>();
-        Home_drawSyncMark(display, cntX - 6, y, synced,
+        Home_drawSyncMark(display, SBX - 8, y, synced,
                           focused ? ST7305_COLOR_WHITE : ST7305_COLOR_BLACK);
 
         String title = app["config"][format("title_%d", idx)].as<String>();
         if (title.isEmpty() || title == "null")
             title = "(empty)";
-        RLCD_drawShapedLabel(u8, tx, y, capUtf8(title, 24).c_str(), false);
+        RLCD_drawShapedLabel(u8, tx, y, capUtf8(title, 17).c_str(), false);
 
         if (focused)
         {
@@ -234,24 +238,15 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         }
     }
 
-    Home_drawMacScroll(display, SBX, 36, Home_dividerY() - 6,
-                       page * HOME_PER_PAGE, HOME_PER_PAGE, g_count);
+    Home_drawMacScroll(display, SBX, 36, 290, page * HOME_PER_PAGE, HOME_PER_PAGE, g_count);
 
-    display->drawLine(0, Home_dividerY(), 400, Home_dividerY(), 1);
-
-    // ---- the same cards the Settings tab drew, three across
+    // ---- cards, right: one column, edge to edge
     int ids[16];
     int n = Settings_cards(ids, 16);
-    const int MX = 8, GAP = 6;
-    int cw = (400 - 2 * MX - (CARD_COLS - 1) * GAP) / CARD_COLS;
-    int ch = CARD_H;
-
+    int ch = Home_cardH();
     for (int i = 0; i < n; i++)
-    {
-        int cx = MX + (i % CARD_COLS) * (cw + GAP);
-        int cy = Home_cardTop() + (i / CARD_COLS) * (ch + CARD_GAP);
-        Settings_drawCard(display, u8, ids[i], cx, cy, cw, ch, g_inCards && i == g_card);
-    }
+        Settings_drawCard(display, u8, ids[i], CARD_X, CARD_TOP_Y + i * ch, CARD_W, ch,
+                          g_inCards && i == g_card);
 }
 
 void Home_keyboard(char key)
@@ -267,6 +262,15 @@ void Home_keyboard(char key)
 
     // Tab moves between the two halves; the arrows then stay inside whichever
     // half has the cursor, so neither list ever "escapes" under an arrow press.
+    // The divider is vertical now, so Right crosses to the cards and Left comes
+    // back. Tab still works for anyone who learned it.
+    if (!g_inCards && key == 19)
+    {
+        g_inCards = true;
+        Menu_clear();
+        return;
+    }
+
     if (key == '\t' || key == 9)
     {
         g_inCards = !g_inCards;
@@ -291,10 +295,10 @@ void Home_keyboard(char key)
         if (g_card >= n)
             g_card = n - 1;
 
-        if (key == 20) { if (g_card >= CARD_COLS) g_card -= CARD_COLS; Menu_clear(); return; }
-        if (key == 21) { if (g_card + CARD_COLS < n) g_card += CARD_COLS; Menu_clear(); return; }
-        if (key == 19) { if (g_card + 1 < n) g_card++; Menu_clear(); return; }
-        if (key == 18) { if (g_card > 0) g_card--; Menu_clear(); return; }
+        if (key == 20) { if (g_card > 0) g_card--; Menu_clear(); return; }     // Up
+        if (key == 21) { if (g_card + 1 < n) g_card++; Menu_clear(); return; } // Down
+        if (key == 18) { g_inCards = false; Menu_clear(); return; }            // Left: back to the files
+        if (key == 19) { Menu_clear(); return; }                               // nothing right of here
         if (key == '\n' || key == '\r') { Settings_openCard(ids[g_card]); return; }
         if (key == 27 || key == MENU) { app0["screen"] = WORDPROCESSOR; return; }
         if (Settings_letter(key))
