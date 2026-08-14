@@ -21,7 +21,6 @@ void Menu_keyboard(int key);
 void Menu_clear();
 
 // Draw the FILES / SETTINGS tab strip. activeTab: 0 = FILES, 1 = SETTINGS.
-void Menu_drawTabs(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, int activeTab);
 
 // Draw a plain title header (same position/divider as the tabs) for the deeper
 // drill-down screens, so every menu screen shares one header style.

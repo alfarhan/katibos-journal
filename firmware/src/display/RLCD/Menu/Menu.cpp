@@ -49,6 +49,11 @@ void Menu_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     // menu entry goes to FILES as usual.
     int target = app["menu"]["goto"] | MENU_HOME;
     app["menu"].remove("goto");
+    // Ctrl+. used to open the SETTINGS tab; with one screen it means "start me in
+    // the cards half" instead.
+    Home_focusCards(target == MENU_SETTINGS);
+    if (target == MENU_SETTINGS)
+        target = MENU_HOME;
     app["menu"]["state"] = target;
 
     // Force the sub-screen's setup to run on every menu entry (not just on a
@@ -159,10 +164,13 @@ void Menu_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     }
     else if (menu_state == MENU_SETTINGS)
     {
+        // FILES and SETTINGS are one screen now. Sub-screens still ask to return
+        // to MENU_SETTINGS, so fold it into HOME rather than chase every caller.
+        app["menu"]["state"] = MENU_HOME;
+        menu_state = MENU_HOME;
         if (menu_state_prev != menu_state)
-            Settings_setup(display, u8);
-
-        Settings_render(display, u8);
+            Home_setup(display, u8);
+        Home_render(display, u8);
     }
     else if (menu_state == MENU_HELP)
     {
@@ -297,7 +305,7 @@ void Menu_keyboard(int key)
     // Settings
     else if (menu_state == MENU_SETTINGS)
     {
-        Settings_keyboard(key);
+        Home_keyboard(key); // MENU_SETTINGS folds into the combined home screen
         return;
     }
 
@@ -343,59 +351,7 @@ void Menu_clear()
     menu_clear = true;
 }
 
-// Shared FILES / SETTINGS tab strip, drawn just under the title bar. The active
-// tab gets an inverse bar; the inactive one is plain. ←/→ switch between them.
-// A small deck: the About mark shrunk to a title-bar icon.
-static void drawDeckIcon(ST7305_4p2_BW_DisplayDriver *display, int x, int y)
-{
-    display->drawRectangle(x, y, x + 12, y + 15, 1);
-    display->drawRectangle(x + 2, y + 2, x + 10, y + 8, 1);
-    display->drawFilledRectangle(x + 3, y + 11, x + 9, y + 13, 1);
-}
 
-void Menu_drawTabs(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, int activeTab)
-{
-    // The two tab screens are the desktop, so they carry the system title bar;
-    // every other screen gets its own title through Menu_drawHeader.
-    int iconX = RLCD_drawTitleBar(display, u8, 0, 0, 400, 26, "katibOS  كاتب", 20);
-    drawDeckIcon(display, iconX, 5);
-
-    int y = 46;
-    u8->setFont(u8g2_font_profont17_tf);
-
-    // FILES
-    if (activeTab == 0)
-    {
-        display->drawFilledRectangle(6, y - 14, 70, y + 4, 1);
-        u8->setForegroundColor(ST7305_COLOR_WHITE);
-        u8->setBackgroundColor(ST7305_COLOR_BLACK);
-    }
-    u8->setCursor(12, y);
-    u8->print("FILES");
-    if (activeTab == 0)
-    {
-        u8->setForegroundColor(ST7305_COLOR_BLACK);
-        u8->setBackgroundColor(ST7305_COLOR_WHITE);
-    }
-
-    // SETTINGS
-    if (activeTab == 1)
-    {
-        display->drawFilledRectangle(78, y - 14, 170, y + 4, 1);
-        u8->setForegroundColor(ST7305_COLOR_WHITE);
-        u8->setBackgroundColor(ST7305_COLOR_BLACK);
-    }
-    u8->setCursor(84, y);
-    u8->print("SETTINGS");
-    if (activeTab == 1)
-    {
-        u8->setForegroundColor(ST7305_COLOR_BLACK);
-        u8->setBackgroundColor(ST7305_COLOR_WHITE);
-    }
-
-    // divider under the header tabs
-    display->drawLine(0, 56, 400, 56, 1);
-}
 
 void Menu_drawHeader(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, const char *title)
 {

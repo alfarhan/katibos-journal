@@ -4,6 +4,7 @@
 
 // marks the menu dirty so it repaints (defined in the RLCD Menu module)
 void Menu_clear();
+#include "display/RLCD/Menu/Home/Home.h" // Home_focusCards - Ctrl+. targets the cards
 
 //
 #include "keyboard/Locale/locale.h"
@@ -274,7 +275,14 @@ void keyboard_HID2Ascii(uint8_t keycode, uint8_t modifier, bool pressed)
   case 0x4b: display_keyboard(22, pressed, keycode); return;  // Page Up
   case 0x4e: display_keyboard(23, pressed, keycode); return;  // Page Down
   case 0x4c: display_keyboard(127, pressed, keycode); return; // Delete (forward)
-  case 0x2b: display_keyboard(' ', pressed, keycode); return; // Tab -> space, in every layout (the editor drops a raw '\t', and the Arabic table emitted one, so Tab did nothing in Arabic)
+  // Tab is a space IN THE EDITOR, in every layout (the editor drops a raw '\t',
+  // and the Arabic table emitted one, so Tab did nothing in Arabic). Outside the
+  // editor it stays a Tab, because the home screen uses it to cross between the
+  // file list and the settings cards.
+  case 0x2b:
+    display_keyboard(status()["screen"].as<int>() == WORDPROCESSOR ? ' ' : '\t',
+                     pressed, keycode);
+    return;
   default: break;
   }
 
@@ -375,8 +383,10 @@ void keyboard_HID2Ascii(uint8_t keycode, uint8_t modifier, bool pressed)
     return;
   }
 
-  // Ctrl + . opens the SETTINGS tab, the same way Ctrl + , opens Preferences -
-  // the two neighbouring keys reach the two setting surfaces.
+  // Ctrl + . puts the cursor on the settings CARDS, the same way Ctrl + , opens
+  // Preferences - the two neighbouring keys reach the two setting surfaces. There
+  // is no separate SETTINGS screen any more, so this focuses the lower half of the
+  // combined home rather than switching screens.
   if (keycode == 0x37 && ctrl)
   {
     if (pressed)
@@ -384,8 +394,9 @@ void keyboard_HID2Ascii(uint8_t keycode, uint8_t modifier, bool pressed)
       JsonDocument &app = status();
       if (app["screen"].as<int>() == MENUSCREEN)
       {
-        app["menu"]["state"] = MENU_SETTINGS;
-        Menu_clear(); // mark dirty so the menu repaints the new screen
+        app["menu"]["state"] = MENU_HOME;
+        Home_focusCards(true); // already in the menu: just cross the divider
+        Menu_clear();          // mark dirty so the menu repaints
       }
       else
       {

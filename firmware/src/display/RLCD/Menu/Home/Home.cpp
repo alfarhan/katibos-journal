@@ -9,6 +9,7 @@
 #include "service/Tools/TextUtil.h"
 #include "display/RLCD/display_RLCD.h"
 #include "display/RLCD/Menu/FileList/Pagination.h"
+#include "display/RLCD/Menu/Settings/Settings.h"
 
 #include <algorithm>
 
@@ -17,7 +18,21 @@
 // well above any realistic journal). Cheap, safe (only existing tested APIs),
 // and re-run each time the Home screen is entered.
 static const int HOME_MAX_FILES = 100;
-static const int HOME_PER_PAGE = 10;
+// The list shares the screen with the settings cards now, so a "page" is what
+// fits above the divider rather than the whole panel.
+static const int HOME_PER_PAGE = 4;
+
+// Geometry of the combined screen. Cards are 3 across because "Preferences" is
+// 98px and a 4-across card would only be 91 - measured, not guessed.
+static const int LIST_TOP = 52;   // first row baseline
+static const int LIST_PITCH = 22;
+static const int DIVIDER_Y = 134;
+static const int CARD_TOP = 142;
+static const int CARD_COLS = 3;
+
+// Which half has the cursor. Tab moves between them; the arrows stay inside.
+static bool g_inCards = false;
+static int g_card = 0;
 
 static int g_indices[HOME_MAX_FILES];
 static int g_count = 0;
@@ -48,6 +63,37 @@ static void Home_drawSyncMark(ST7305_4p2_BW_DisplayDriver *display, int xr, int 
     {
         display->drawFilledRectangle(xr - 7, y - 7, xr - 2, y - 2, color); // pending dot
     }
+}
+
+// Classic Mac scroll bar: a stippled track between two arrow boxes, with a plain
+// thumb sized to the visible fraction. The 50/50 checkerboard reads as grey on
+// this panel, which is how it read on a compact Mac.
+static void Home_drawMacScroll(ST7305_4p2_BW_DisplayDriver *display,
+                               int x, int top, int bottom, int first, int visible, int total)
+{
+    const int W = 16;
+    display->drawRectangle(x, top, x + W, bottom, 1);
+    display->drawLine(x, top + W, x + W, top + W, 1);
+    display->drawLine(x, bottom - W, x + W, bottom - W, 1);
+    display->drawFilledTriangle(x + 4, top + 11, x + 12, top + 11, x + 8, top + 5, 1);
+    display->drawFilledTriangle(x + 4, bottom - 11, x + 12, bottom - 11, x + 8, bottom - 5, 1);
+
+    int tTop = top + W + 1, tBot = bottom - W - 1;
+    for (int y = tTop; y < tBot; y++)
+        for (int px = x + 1; px < x + W; px++)
+            if (((px + y) & 1) == 0)
+                display->writePoint(px, y, true);
+
+    if (total <= visible)
+        return; // everything fits: track only, no thumb, like the Mac did
+
+    int span = tBot - tTop;
+    int th = span * visible / total;
+    if (th < 14)
+        th = 14;
+    int ty = tTop + (span - th) * first / (total - visible);
+    display->drawFilledRectangle(x + 1, ty, x + W - 1, ty + th, 0);
+    display->drawRectangle(x + 1, ty, x + W - 1, ty + th, 1);
 }
 
 static void Home_enumerate()
@@ -88,6 +134,13 @@ static void Home_open(int fileIndex)
 }
 
 //
+void Home_focusCards(bool on)
+{
+    g_inCards = on;
+    if (on)
+        g_card = 0;
+}
+
 void Home_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
     Menu_clear();
@@ -108,58 +161,53 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
     JsonDocument &app = status();
 
-    // ---- paged, cursor-driven file list (full width) ----
-    int pos_x = 10;
+    // The restart confirm belongs to the cards and takes the whole screen.
+    if (Settings_confirmActive())
+    {
+        Settings_drawConfirm(display, u8);
+        return;
+    }
+
+    RLCD_drawTitleBar(display, u8, 0, 0, 400, 28, "katibOS  \u0643\u0627\u062a\u0628", 0);
+
+    // ---- files, above the rule. No header: the list is the screen's subject,
+    // ---- and the row saved goes to a file instead of a label.
     int page = paginate::pageOf(g_cursor, HOME_PER_PAGE);
     int rows = paginate::rowsOnPage(page, HOME_PER_PAGE, g_count);
+    const int SBX = 378;
 
-    Menu_drawTabs(display, u8, 0);
-
-
+    u8->setFont(u8g2_font_profont17_tf);
     for (int r = 0; r < rows; r++)
     {
         int idx = g_indices[page * HOME_PER_PAGE + r];
-        int y = 76 + r * 22;
-        bool focused = (page * HOME_PER_PAGE + r == g_cursor);
+        int y = LIST_TOP + r * LIST_PITCH;
+        bool focused = (!g_inCards && page * HOME_PER_PAGE + r == g_cursor);
 
         if (focused)
         {
-            display->drawFilledRectangle(pos_x - 2, y - 15, 380, y + 4, 1);
+            display->drawFilledRectangle(6, y - 15, SBX - 6, y + 4, 1);
             u8->setForegroundColor(ST7305_COLOR_WHITE);
             u8->setBackgroundColor(ST7305_COLOR_BLACK);
         }
 
-        // Number first, on the left (LTR), then the name. Drawn as two pieces so
-        // an Arabic title never reorders the "[N]" to the right - the prefix is
-        // plain LTR text, the title follows it (shaped, RTL within itself).
-        u8->setFont(u8g2_font_profont17_tf);
-        u8->setCursor(pos_x, y);
+        u8->setCursor(10, y);
         u8->printf("[%d]  ", idx);
         int tx = u8->getCursorX();
 
-        // full-document word count, right-aligned (drawn first so the title can
-        // be capped to whatever space is left of it)
         char cnt[16];
         snprintf(cnt, sizeof(cnt), "%d w", Home_wordCount(idx));
-        int cntX = 374 - u8->getUTF8Width(cnt);
+        int cntX = SBX - 12 - u8->getUTF8Width(cnt);
         u8->setCursor(cntX, y);
         u8->print(cnt);
 
-        // sync marker just left of the word count
         bool synced = !app["config"][format("unsynced_%d", idx)].as<bool>();
         Home_drawSyncMark(display, cntX - 6, y, synced,
                           focused ? ST7305_COLOR_WHITE : ST7305_COLOR_BLACK);
 
         String title = app["config"][format("title_%d", idx)].as<String>();
         if (title.isEmpty() || title == "null")
-        {
-            u8->setCursor(tx, y);
-            u8->print("-");
-        }
-        else
-        {
-            RLCD_drawShapedLabel(u8, tx, y, capUtf8(title, 16).c_str(), false);
-        }
+            title = "(empty)";
+        RLCD_drawShapedLabel(u8, tx, y, capUtf8(title, 24).c_str(), false);
 
         if (focused)
         {
@@ -168,13 +216,75 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         }
     }
 
-    // scrollbar in the right gutter - where the list stands, at a glance
-    RLCD_drawScrollbar(display, 384, 64, 286, page * HOME_PER_PAGE, HOME_PER_PAGE, g_count);
+    Home_drawMacScroll(display, SBX, 36, DIVIDER_Y - 8,
+                       page * HOME_PER_PAGE, HOME_PER_PAGE, g_count);
+
+    display->drawLine(0, DIVIDER_Y, 400, DIVIDER_Y, 1);
+
+    // ---- the same cards the Settings tab drew, three across
+    int ids[16];
+    int n = Settings_cards(ids, 16);
+    const int MX = 8, GAP = 6;
+    int cw = (400 - 2 * MX - (CARD_COLS - 1) * GAP) / CARD_COLS;
+    int crows = (n + CARD_COLS - 1) / CARD_COLS;
+    int ch = (292 - CARD_TOP - (crows - 1) * 5) / crows;
+
+    for (int i = 0; i < n; i++)
+    {
+        int cx = MX + (i % CARD_COLS) * (cw + GAP);
+        int cy = CARD_TOP + (i / CARD_COLS) * (ch + 5);
+        Settings_drawCard(display, u8, ids[i], cx, cy, cw, ch, g_inCards && i == g_card);
+    }
 }
 
-//
 void Home_keyboard(char key)
 {
+    JsonDocument &app0 = status();
+
+    // The restart confirm owns every key while it is up.
+    if (Settings_confirmActive())
+    {
+        Settings_confirmKey(key);
+        return;
+    }
+
+    // Tab moves between the two halves; the arrows then stay inside whichever
+    // half has the cursor, so neither list ever "escapes" under an arrow press.
+    if (key == '\t' || key == 9)
+    {
+        g_inCards = !g_inCards;
+        if (g_inCards)
+        {
+            int ids[16];
+            int n = Settings_cards(ids, 16);
+            if (g_card >= n)
+                g_card = n - 1;
+        }
+        Menu_clear();
+        return;
+    }
+
+    // ---- cards half ----
+    if (g_inCards)
+    {
+        int ids[16];
+        int n = Settings_cards(ids, 16);
+        if (n <= 0)
+            return;
+        if (g_card >= n)
+            g_card = n - 1;
+
+        if (key == 20) { if (g_card >= CARD_COLS) g_card -= CARD_COLS; Menu_clear(); return; }
+        if (key == 21) { if (g_card + CARD_COLS < n) g_card += CARD_COLS; Menu_clear(); return; }
+        if (key == 19) { if (g_card + 1 < n) g_card++; Menu_clear(); return; }
+        if (key == 18) { if (g_card > 0) g_card--; Menu_clear(); return; }
+        if (key == '\n' || key == '\r') { Settings_openCard(ids[g_card]); return; }
+        if (key == 27 || key == MENU) { app0["screen"] = WORDPROCESSOR; return; }
+        if (Settings_letter(key))
+            return;
+        return;
+    }
+
     JsonDocument &app = status();
 
     // ---- file-list navigation (arrow/page codes are layout-independent) ----
@@ -260,13 +370,8 @@ void Home_keyboard(char key)
         return;
     }
 
-    // Right arrow switches to the SETTINGS tab
-    if (key == 19)
-    {
-        app["menu"]["state"] = MENU_SETTINGS;
-        Menu_clear();
-        return;
-    }
+    // Left/Right no longer switch tabs - there is one screen now, and Tab is
+    // what crosses the divider.
 
     // Settings fast-paths, reachable straight from the file list (same letters
     // as the SETTINGS tab) so a setting is one key away from anywhere in the menu.

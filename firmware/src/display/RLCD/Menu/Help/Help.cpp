@@ -57,7 +57,7 @@ static const HelpLine EDIT_RIGHT[] = {
 static const HelpLine MENU_LEFT[] = {
     HDR("FILES & MENU"),
     {"UP/DN", "Move", false},
-    {"<- / ->", "Switch tab", false},
+    {"TAB", "Files/cards", false},
     {"ENT", "Open", false},
     {"N", "New file", false},
     {"R", "Rename", false},
@@ -65,7 +65,7 @@ static const HelpLine MENU_LEFT[] = {
     {"T", "Restart", false},
 };
 static const HelpLine MENU_RIGHT[] = {
-    HDR("JUMP (files/settings)"),
+    HDR("JUMP (from home)"),
     {"P", "Preferences", false},
     {"L", "Language", false},
     {"W", "Wi-Fi", false},

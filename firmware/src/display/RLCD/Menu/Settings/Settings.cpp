@@ -30,8 +30,6 @@ enum
 // map has been bitten by before.
 static bool restart_confirm = false;
 
-static int g_cursor = 0;
-
 // Build the visible action list (Sync only appears when a sync URL is set), so
 // render and keyboard agree on what each cursor row means.
 static int buildList(int *ids)
@@ -280,166 +278,102 @@ static void dispatch(int act)
     }
 }
 
-void Settings_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
+// The FILES/SETTINGS tabs are one screen now: Home draws these cards and routes
+// their keys, so this file is the card MODEL only. Its old setup/render/keyboard
+// entry points are gone rather than left to rot.
+
+// ---- shared card model (see Settings.h) -------------------------------------
+// Thin wrappers so the combined Home screen can draw and drive the same cards
+// without duplicating the list, the icons or the dispatch.
+int Settings_cards(int *ids, int max)
 {
-    Menu_clear();
-    g_cursor = 0;
-}
-
-void Settings_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
-{
-    if (restart_confirm)
-    {
-        Menu_drawTabs(display, u8, 1);
-        const int bx = 40, by = 96, bw = 320, bh = 104;
-        RLCD_drawWindow(display, u8, bx, by, bw, bh, "RESTART");
-        u8->setFont(u8g2_font_profont17_tf);
-        u8->setCursor(bx + 16, by + 50);
-        u8->print("Restart the device?");
-        u8->setCursor(bx + 16, by + 74);
-        u8->print("Any open file is saved first.");
-
-        static const RLCD_Hint HINTS[] = {{"Y", "RESTART"}, {"ANY", "CANCEL"}};
-        RLCD_drawHintBar(display, u8, bx + (bw - RLCD_hintBarWidth(u8, RLCD_HINTS(HINTS))) / 2,
-                         by + bh + 30, RLCD_HINTS(HINTS));
-        return;
-    }
-
-    Menu_drawTabs(display, u8, 1);
-
-    int ids[12];
-    int n = buildList(ids);
-
-    // Settings as a grid of tiles, three to a row: an icon over the name, with
-    // the name's shortcut letter underlined. Each tile is a small window (shadow
-    // + frame); the focused one fills black, the same inversion the file list and
-    // the hint chips use. The tiles carry their own keys, so this screen needs no
-    // footer hint bar.
-    const int MX = 10, GAP = 8, COLS = 3;
-    const int top = 64, bottom = 292;
-    const int ICON = 28, CAP = 12, ICON_GAP = 6; // glyph cap height / icon-to-text gap
-    int rows = (n + COLS - 1) / COLS;
-    int cardW = (400 - 2 * MX - (COLS - 1) * GAP) / COLS;
-    int cardH = (bottom - top - (rows - 1) * GAP) / rows;
-
-    // icon + gap + one text line, centered as one block however tall the card is
-    int blockY = (cardH - (ICON + ICON_GAP + CAP)) / 2;
-    if (blockY < 4)
-        blockY = 4;
-
-    u8->setFont(u8g2_font_profont17_tf);
+    int tmp[16];
+    int n = buildList(tmp);
+    if (n > max)
+        n = max;
     for (int i = 0; i < n; i++)
+        ids[i] = tmp[i];
+    return n;
+}
+
+const char *Settings_cardLabel(int id) { return actionLabel(id); }
+char Settings_cardKey(int id) { return actionKey(id); }
+void Settings_openCard(int id) { dispatch(id); }
+
+// One card, exactly as the Settings grid draws it: framed window, inverted when
+// focused, icon centred over the name with the shortcut letter underlined.
+void Settings_drawCard(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8,
+                       int id, int x, int y, int w, int h, bool focused)
+{
+    // The combined Home screen gives a card less height than the full grid does,
+    // so the mark shrinks rather than pushing the name off the bottom edge.
+    const int ICON = (h >= 60) ? 28 : 20;
+    const int CAP = 12, ICON_GAP = 6;
+    int blockY = (h - (ICON + ICON_GAP + CAP)) / 2;
+    if (blockY < 2)
+        blockY = 2;
+
+    RLCD_drawWindow(display, u8, x, y, w, h, nullptr);
+    if (focused)
+        display->drawFilledRectangle(x + 1, y + 1, x + w - 1, y + h - 1, 1);
+
+    uint16_t ink = focused ? ST7305_COLOR_WHITE : ST7305_COLOR_BLACK;
+    drawActionIcon(display, id, x + (w - ICON) / 2, y + blockY, ink);
+
+    if (focused)
     {
-        int cx = MX + (i % COLS) * (cardW + GAP);
-        int cy = top + (i / COLS) * (cardH + GAP);
-        bool focused = (i == g_cursor);
-
-        RLCD_drawWindow(display, u8, cx, cy, cardW, cardH, nullptr);
-        if (focused)
-            display->drawFilledRectangle(cx + 1, cy + 1, cx + cardW - 1, cy + cardH - 1, 1);
-
-        uint16_t ink = focused ? ST7305_COLOR_WHITE : ST7305_COLOR_BLACK;
-        drawActionIcon(display, ids[i], cx + (cardW - ICON) / 2, cy + blockY, ink);
-
-        if (focused)
-        {
-            u8->setForegroundColor(ST7305_COLOR_WHITE);
-            u8->setBackgroundColor(ST7305_COLOR_BLACK);
-        }
-
-        const char *label = actionLabel(ids[i]);
-        drawKeyedLabel(display, u8, cx + (cardW - u8->getUTF8Width(label)) / 2,
-                       cy + blockY + ICON + ICON_GAP + CAP, label, actionKey(ids[i]), ink);
-
-        if (focused)
-        {
-            u8->setForegroundColor(ST7305_COLOR_BLACK);
-            u8->setBackgroundColor(ST7305_COLOR_WHITE);
-        }
+        u8->setForegroundColor(ST7305_COLOR_WHITE);
+        u8->setBackgroundColor(ST7305_COLOR_BLACK);
+    }
+    u8->setFont(u8g2_font_profont17_tf);
+    const char *label = actionLabel(id);
+    drawKeyedLabel(display, u8, x + (w - u8->getUTF8Width(label)) / 2,
+                   y + blockY + ICON + ICON_GAP + CAP, label, actionKey(id), ink);
+    if (focused)
+    {
+        u8->setForegroundColor(ST7305_COLOR_BLACK);
+        u8->setBackgroundColor(ST7305_COLOR_WHITE);
     }
 }
 
-void Settings_keyboard(int key)
+bool Settings_letter(int key)
 {
-    JsonDocument &app = status();
-
-    // While the confirm is up it owns every key: Y restarts, anything else backs
-    // out. Handled before the navigation keys so arrows can't move behind it.
-    if (restart_confirm)
-    {
-        restart_confirm = false;
-        Menu_clear();
-        if (key == 'Y' || key == 'y')
+    int up = (key >= 'a' && key <= 'z') ? key - 32 : key;
+    int ids[16];
+    int n = Settings_cards(ids, 16);
+    for (int i = 0; i < n; i++)
+        if (actionKey(ids[i]) && actionKey(ids[i]) == up)
         {
-            Editor::getInstance().saveFile();
-            _log("[settings] restart confirmed\n");
-            ota_reboot();
+            dispatch(ids[i]);
+            return true;
         }
-        return;
-    }
-    int ids[12];
-    int n = buildList(ids);
+    return false;
+}
 
-    const int COLS = 3;
-    if (key == 20) // Up - previous row
-    {
-        if (g_cursor >= COLS)
-            g_cursor -= COLS;
-        Menu_clear();
-        return;
-    }
-    if (key == 21) // Down - next row, clamped to the last (possibly short) row
-    {
-        if (g_cursor + COLS < n)
-            g_cursor += COLS;
-        else if (g_cursor / COLS < (n - 1) / COLS)
-            g_cursor = n - 1;
-        Menu_clear();
-        return;
-    }
-    if (key == 19) // Right - next tile in the row
-    {
-        if (g_cursor % COLS != COLS - 1 && g_cursor + 1 < n)
-            g_cursor++;
-        Menu_clear();
-        return;
-    }
-    if (key == 18) // Left - previous tile, or out to FILES from the first column
-    {
-        if (g_cursor % COLS != 0)
-            g_cursor--;
-        else
-            app["menu"]["state"] = MENU_HOME;
-        Menu_clear();
-        return;
-    }
-    if (key == 'B' || key == 'b' || key == '\b') // Back -> Files
-    {
-        app["menu"]["state"] = MENU_HOME;
-        return;
-    }
-    if (key == 27 || key == MENU) // Esc -> editor
-    {
-        app["screen"] = WORDPROCESSOR;
-        return;
-    }
+bool Settings_confirmActive() { return restart_confirm; }
 
-    if (key == '\n' || key == '\r')
-    {
-        dispatch(ids[g_cursor]);
-        return;
-    }
+void Settings_drawConfirm(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
+{
+    const int bx = 40, by = 96, bw = 320, bh = 104;
+    RLCD_drawWindow(display, u8, bx, by, bw, bh, "RESTART");
+    u8->setFont(u8g2_font_profont17_tf);
+    u8->setCursor(bx + 16, by + 50);
+    u8->print("Restart the device?");
+    u8->setCursor(bx + 16, by + 74);
+    u8->print("Any open file is saved first.");
+    static const RLCD_Hint HINTS[] = {{"Y", "RESTART"}, {"ANY", "CANCEL"}};
+    RLCD_drawHintBar(display, u8, bx + (bw - RLCD_hintBarWidth(u8, RLCD_HINTS(HINTS))) / 2,
+                     by + bh + 30, RLCD_HINTS(HINTS));
+}
 
-    // letter fast-paths (Language / Time zone / Sync provider live in Preferences)
-    if (key == 'P' || key == 'p') dispatch(ACT_PREFS);
-    else if (key == 'A' || key == 'a') dispatch(ACT_ABOUT);
-    else if (key == 'T' || key == 't') dispatch(ACT_RESTART);
-    else if (key == 'W' || key == 'w') dispatch(ACT_WIFI);
-    else if (key == 'S' || key == 's') dispatch(ACT_SYNC);
-#ifdef USE_BLE_KEYBOARD_HOST
-    else if (key == 'K' || key == 'k') dispatch(ACT_BTKB);
-#endif
-    else if (key == 'D' || key == 'd') dispatch(ACT_DRIVE);
-    else if (key == 'H' || key == 'h') dispatch(ACT_HELP);
-    else if (key == 'U' || key == 'u') dispatch(ACT_UPDATE);
+void Settings_confirmKey(int key)
+{
+    restart_confirm = false;
+    Menu_clear();
+    if (key == 'Y' || key == 'y')
+    {
+        Editor::getInstance().saveFile();
+        _log("[settings] restart confirmed\n");
+        ota_reboot();
+    }
 }
