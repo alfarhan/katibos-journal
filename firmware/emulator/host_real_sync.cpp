@@ -119,7 +119,6 @@ void sync_start()
     int ok = 0, total = 0;
     sync_reconcile(app, url, ok, total);
 }
-bool sync_connect_wifi(JsonDocument &, const char *, const char *) { return true; }
 void sync_stop() {}
 void sync_send()
 {

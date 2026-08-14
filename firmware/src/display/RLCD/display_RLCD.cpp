@@ -20,6 +20,7 @@ U8G2_FOR_ST73XX u8g2;
 #include "Update/Update.h"
 
 #include "service/Bidi/Bidi.h"
+#include "service/Idle/Idle.h"
 #include <string.h>
 
 // Fonts used for labels (file titles, status bar). Latin glyphs come from the
@@ -205,6 +206,11 @@ int display_RLCD_core()
 }
 
 //
+// Idle throttle hooks. The panel keeps showing the page in Low Power mode - it
+// just refreshes it more cheaply - so there is nothing for the user to lose.
+static void rlcd_idle_enter() { display.Low_Power_Mode(); }
+static void rlcd_idle_exit() { display.High_Power_Mode(); }
+
 void display_RLCD_setup()
 {
   _log("DISPLAY RLCD SETUP\n");
@@ -217,6 +223,8 @@ void display_RLCD_setup()
   u8g2.setFontMode(0);
   u8g2.setForegroundColor(ST7305_COLOR_BLACK);
   u8g2.setBackgroundColor(ST7305_COLOR_WHITE);
+
+  idle_setup(rlcd_idle_enter, rlcd_idle_exit);
 }
 
 //
@@ -226,6 +234,8 @@ void display_RLCD_loop()
   if (millis() - last > 100)
   {
     last = millis();
+
+    idle_loop();
 
     JsonDocument &app = status();
     int screen = app["screen"].as<int>();

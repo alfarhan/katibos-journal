@@ -1,4 +1,5 @@
 #include "display.h"
+#include "service/Idle/Idle.h"
 #include "app/app.h"
 
 // Reflective LCD
@@ -52,6 +53,10 @@ void display_loop()
 //
 void display_keyboard(int key, bool pressed, int index)
 {
+    // Any key ends the idle throttle before the event is dispatched, so the
+    // screen is back at full refresh by the time this keystroke renders.
+    idle_touch();
+
   _debug("[display_keyboard] Key: [%d] pressed: %d index: %d\n", key, pressed, index);
 
   display_RLCD_keyboard(key, pressed, index);

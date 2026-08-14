@@ -28,6 +28,8 @@ HOST_CPP := host_main.cpp host_runtime.cpp host_log.cpp host_st7305.cpp \
 FW_CPP := \
   $(SRC)/service/Sync/SyncCore.cpp \
   $(SRC)/service/Ai/Ai.cpp \
+  $(SRC)/service/Net/Net.cpp \
+  $(SRC)/service/Idle/Idle.cpp \
   $(SRC)/display/display.cpp \
   $(SRC)/display/RLCD/display_RLCD.cpp \
   $(SRC)/display/RLCD/WordProcessor/WordProcessor.cpp \

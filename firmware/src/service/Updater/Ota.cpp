@@ -2,13 +2,13 @@
 #include "app/app.h"
 #include "display/display.h"
 #include "service/Sync/SyncCore.h" // sync_http_get (device + emulator transports)
+#include "service/Net/Net.h"    // shared wifi bring-up
 
 #ifndef HOST_EMU
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <Update.h>
-#include "service/Sync/Sync.h"           // sync_connect_wifi
 #include "service/WifiEntry/WifiEntry.h" // wifi_config_load
 #endif
 
@@ -38,40 +38,8 @@ static void setStage(const String &msg, int progress)
         g_redraw();
 }
 
-// Bring Wi-Fi up with a saved credential. The emulator's HTTP transport is
-// libcurl, so it needs no radio.
-static bool ota_ensure_wifi()
-{
-#ifdef HOST_EMU
-    return true;
-#else
-    JsonDocument &app = status();
-    if (WiFi.status() == WL_CONNECTED)
-        return true;
-
-    wifi_config_load();
-    WiFi.mode(WIFI_STA);
-    WiFi.setHostname("MICROJOURNAL");
-    delay(2000);
-
-    int n = WiFi.scanNetworks();
-    JsonArray saved = app["wifi"]["access_points"].as<JsonArray>();
-    for (int i = 0; i < n; i++)
-    {
-        String ssid = WiFi.SSID(i);
-        for (JsonVariant ap : saved)
-        {
-            if (ap["ssid"].as<String>() == ssid)
-            {
-                String pw = ap["password"].as<String>();
-                if (sync_connect_wifi(app, ssid.c_str(), pw.c_str()))
-                    return true;
-            }
-        }
-    }
-    return false;
-#endif
-}
+// Progress from the shared connect path goes to the update screen's status line.
+static void otaNetProgress(const String &msg) { setStage(msg, -1); }
 
 String ota_update_url()
 {
@@ -92,9 +60,9 @@ void ota_check()
     JsonDocument &app = status();
 
     setState(OTA_CHECKING, "Connecting to WiFi...");
-    if (!ota_ensure_wifi())
+    if (net_connect(app, "raw.githubusercontent.com", otaNetProgress) != NET_OK)
     {
-        setState(OTA_ERROR, "WiFi connection failed");
+        setState(OTA_ERROR, net_last_error());
         return;
     }
 

@@ -4,6 +4,7 @@
 #include "display/display.h"
 #include "display/RLCD/display_RLCD.h"
 #include "display/RLCD/Menu/FileList/Pagination.h"
+#include "service/Idle/Idle.h"
 
 // One consolidated Preferences screen: behavior toggles/values grouped by
 // section. Editor/display rows cycle in place (the editor re-reads these config
@@ -17,6 +18,7 @@ enum
     R_SPACE,
     R_FLOW,
     R_STATUS,
+    R_IDLE,
     R_LAYOUT,
     R_PROV,
     R_FACTORY,
@@ -35,6 +37,7 @@ static const PRow ROWS[] = {
     {R_SPACE, "Line spacing"},
     {R_FLOW, "Text flow"},
     {R_STATUS, "Status bar"},
+    {R_IDLE, "Power save"},
     {R_HEAD, "INPUT"},
     {R_LAYOUT, "Keyboard layout"},
     {R_HEAD, "SYNC"},
@@ -69,6 +72,15 @@ static String valueStr(JsonDocument &app, int type)
         return FLOW_LBL[(app["config"]["scroll_mode"] | 2) % 3];
     case R_STATUS:
         return app["config"]["statusbar_hidden"].as<bool>() ? "Hidden" : "Shown";
+    case R_IDLE:
+    {
+        int s = idle_timeout_sec();
+        if (s <= 0)
+            return "Off";
+        if (s < 60)
+            return String(s) + "s";
+        return String(s / 60) + " min";
+    }
     case R_LAYOUT:
     {
         String l = app["config"]["keyboard_layout"].as<String>();
@@ -97,6 +109,20 @@ static void cycle(JsonDocument &app, int type, int dir)
     case R_STATUS:
         app["config"]["statusbar_hidden"] = !app["config"]["statusbar_hidden"].as<bool>();
         break;
+    case R_IDLE:
+    {
+        // Off, then a short ladder. After this many seconds without a keystroke
+        // the panel drops to its cheap refresh mode; any key brings it back.
+        static const int STEPS[] = {0, 30, 60, 120, 300};
+        const int n = 5;
+        int cur = idle_timeout_sec(), at = 0;
+        for (int i = 0; i < n; i++)
+            if (STEPS[i] == cur)
+                at = i;
+        at = (at + (dir > 0 ? 1 : n - 1)) % n;
+        app["config"]["idle_secs"] = STEPS[at];
+        break;
+    }
     default:
         return;
     }

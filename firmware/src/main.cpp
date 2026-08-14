@@ -8,6 +8,7 @@
 
 // keyboard
 #include "keyboard/keyboard.h"
+#include "service/Idle/Idle.h"
 
 // Dual Core for ESP32
 #ifdef BOARD_ESP32_S3
@@ -59,6 +60,12 @@ void loop()
 
     //
     keyboard_loop();
+
+    // While throttled, hand the core to the scheduler instead of spinning. The
+    // cost is up to ~30ms of latency on the keystroke that wakes it - the CPU
+    // frequency is deliberately left alone (see Idle.h).
+    if (idle_active())
+        delay(30);
 
     // try to yield to avoid infinite loop
     yield();

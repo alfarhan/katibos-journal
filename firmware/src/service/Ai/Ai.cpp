@@ -5,11 +5,7 @@
 #include "service/Editor/Editor.h"
 #include "service/Tools/Tools.h"
 
-#ifndef HOST_EMU
-#include <WiFi.h>
-#include "service/Sync/Sync.h"           // sync_connect_wifi / sync_stop
-#include "service/WifiEntry/WifiEntry.h" // wifi_config_load
-#endif
+#include "service/Net/Net.h" // shared wifi bring-up - every network path uses it
 
 static const char *AI_DEFAULT_MODEL = "gemini-3.1-pro";
 
@@ -66,53 +62,8 @@ static String ai_model(JsonDocument &app)
     return m;
 }
 
-// ---- wifi ------------------------------------------------------------------
-static bool ai_ensure_wifi(JsonDocument &app)
-{
-#ifdef HOST_EMU
-    (void)app;
-    return true;
-#else
-    if (WiFi.status() == WL_CONNECTED)
-        return true;
-
-    wifi_config_load();
-    WiFi.mode(WIFI_STA);
-    WiFi.setHostname("MICROJOURNAL");
-    setCpuFrequencyMhz(CPU_FREQUENCY_FULL); // the radio needs >= 80MHz
-    delay(2000);
-
-    int n = WiFi.scanNetworks();
-    JsonArray saved = app["wifi"]["access_points"].as<JsonArray>();
-    for (int i = 0; i < n; i++)
-    {
-        String ssid = WiFi.SSID(i);
-        for (JsonVariant ap : saved)
-            if (ap["ssid"].as<String>() == ssid)
-            {
-                String pw = ap["password"].as<String>();
-                if (sync_connect_wifi(app, ssid.c_str(), pw.c_str()))
-                {
-                    // Association is not readiness - DHCP and DNS land a moment
-                    // later, and a TLS connect attempted too early fails with
-                    // start_ssl_client: -1. sync_start() waits here for the same
-                    // reason; this path was missing it.
-                    delay(1500);
-                    _log("[ai] wifi ready, IP %s\n", WiFi.localIP().toString().c_str());
-                    return true;
-                }
-            }
-    }
-    return false;
-#endif
-}
-
-static void ai_wifi_done()
-{
-#ifndef HOST_EMU
-    sync_stop(); // powers the radio down and drops the CPU back to the low clock
-#endif
-}
+// Progress from the shared connect path lands in the editor's status bar.
+static void aiNetProgress(const String &msg) { aiStage(msg); }
 
 // ---- file I/O --------------------------------------------------------------
 static bool ai_read_file(const String &path, String &out, long &size)
@@ -204,10 +155,13 @@ static void ai_run()
     }
 
     aiStage("Connecting to WiFi ...");
-    if (!ai_ensure_wifi(app))
+    NetStatus net = net_connect(app, "generativelanguage.googleapis.com", aiNetProgress);
+    if (net != NET_OK)
     {
-        aiFail("No WiFi - text unchanged");
-        ai_wifi_done();
+        // NET_NO_INTERNET is the hotspot case: associated, leased an IP, and
+        // nothing upstream answers on 443. Saying so beats "TLS failed".
+        aiFail(net_last_error() + " - text unchanged");
+        net_disconnect();
         return;
     }
 
@@ -266,7 +220,7 @@ static void ai_run()
     }
 
     payload = ""; // free the request before parsing the reply
-    ai_wifi_done();
+    net_disconnect();
 
     if (r.code <= 0)
     {

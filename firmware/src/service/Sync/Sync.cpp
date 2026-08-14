@@ -11,6 +11,7 @@
 #include <time.h>
 #include "app/Config/Config.h"
 #include "service/WifiEntry/WifiEntry.h"
+#include "service/Net/Net.h"
 #include <vector>
 #include <algorithm>
 
@@ -111,183 +112,51 @@ void sync_loop()
     }
 }
 
-// Start Sync Process
-// Search for WIFI ACCESS POINTS
+// Progress from the shared connect path goes to the sync status line.
+static void syncNetProgress(const String &msg)
+{
+    JsonDocument &app = status();
+    app["sync_message"] = msg;
+    app["clear"] = true;
+}
+
+// Start Sync Process. Network selection lives in service/Net now - this used to
+// carry its own scan-and-match copy, one of four.
 void sync_start()
 {
-    //
     JsonDocument &app = status();
-
-    //
     _log("[sync_start] Sync Start\n");
 
-    // Load saved WiFi credentials so sync works from ANY trigger (editor Ctrl+U
-    // / Ctrl+Shift+U too), not just after visiting the WiFi or Sync screen.
-    wifi_config_load();
-
-    //
     app["sync_state"] = SYNC_STARTED;
     app["sync_message"] = "Connecting to WiFi";
     app["clear"] = true;
 
-    // full CPU speed while WiFi is in use
-    setCpuFrequencyMhz(CPU_FREQUENCY_FULL);
-
-    // Scan for available networks
-    WiFi.mode(WIFI_STA);
-    WiFi.setHostname("MICROJOURNAL");
-
-    // wait for decent amount of time before using wifi
-    delay(3000);
-
-    //
-    int networksFound = WiFi.scanNetworks();
-    app["sync_message"] = format("Found %d networks", networksFound);
-    app["clear"] = true;
-
-    // reset the network.access_points array
-    JsonArray access_points = app["network"]["access_points"].to<JsonArray>();
-    access_points.clear();
-
-    // Print information about each network
-    for (int i = 0; i < networksFound; ++i)
+    // The Drive backend talks to script.google.com; the git backend to
+    // api.github.com. Probing the one we are about to use turns "TLS failed" into
+    // "joined X but no internet" on a network that won't carry the traffic.
+    const char *probe = sync_provider_is_git(app) ? "api.github.com"
+                                                  : "script.google.com";
+    NetStatus net = net_connect(app, probe, syncNetProgress);
+    if (net != NET_OK)
     {
-        //
-        String ssid = WiFi.SSID(i);
-
-        // print out the information
-        _log("%d: %s (%d dBm)\n", i + 1, ssid.c_str(), WiFi.RSSI(i));
-
-        // add to the access_points list
-        access_points.add(ssid);
+        sync_stop();
+        app["sync_error"] = net_last_error();
+        app["sync_state"] = SYNC_ERROR;
+        app["clear"] = true;
+        return;
     }
 
-    //
-    // Load available WiFi networks from the app["network"]["access_points"] array
-    JsonArray availableNetworks = app["network"]["access_points"].as<JsonArray>();
-
-    // Load saved WiFi connection information from the app["config"]["access_points"] array
-    JsonArray savedAccessPoints = app["wifi"]["access_points"].as<JsonArray>();
-
-    // Iterate through each available network
-    for (JsonVariant availableNetwork : availableNetworks)
-    {
-        // available wifi network
-        String availableSsid = availableNetwork.as<String>();
-        _log("Trying: %s\n", availableSsid.c_str());
-
-        // see if there are any wifi network allowed
-        for (JsonVariant savedAccessPoint : savedAccessPoints)
-        {
-            const char *savedSsid = savedAccessPoint["ssid"];
-            const char *savedPassword = savedAccessPoint["password"];
-
-            _log("Trying to connect to :%s\n", savedSsid);
-
-            // Check if the SSID and password match
-            if (strcmp(availableSsid.c_str(), savedSsid) == 0)
-            {
-
-                // Try to connect to the matching access point
-                if (sync_connect_wifi(app, savedSsid, savedPassword))
-                {
-                    _log("Connected to a matching WiFi network!\n");
-
-                    //
-                    app["sync_message"] = format("Connected to: %s\n", savedSsid);
-                    app["clear"] = true;
-                    _log(app["sync_message"]);
-                    delay(1000); // give some delay for the connection to settle
-
-                    // Sync File Start
-                    sync_send();
-
-                    return; // Exit the function if successfully connected
-                }
-            }
-        }
-    }
-
-    // if it reached this point.
-    // it means no network has been connected
-    sync_stop();
-
-    //
-    app["sync_error"] = "NOT ABLE TO CONNECT TO WIFI";
-    app["sync_state"] = SYNC_ERROR;
+    app["sync_message"] = format("Connected to: %s", app["network"]["ssid"].as<String>().c_str());
     app["clear"] = true;
-    //
+
+    sync_send();
 }
 
 void sync_stop()
 {
-    // power down the WiFi radio entirely
-    // WiFi.disconnect alone leaves the radio on in STA mode draining the battery
-    // WiFi.begin re-enables STA mode so retrying another network still works
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
-
-    // back to the battery saving CPU speed
-    setCpuFrequencyMhz(CPU_FREQUENCY_LOW);
+    net_disconnect(); // one implementation of "radio off, clock back down"
 }
 
-bool sync_connect_wifi(JsonDocument &app, const char *ssid, const char *password)
-{
-    // Connect to WiFi
-    delay(1000);
-
-    //
-    String message = format("trying to connect to %s ", ssid);
-    app["sync_message"] = message;
-    app["clear"] = true;
-    _log(message.c_str());
-
-    //
-    WiFi.begin(ssid, password);
-    delay(1000);
-
-    int attempt = 0;
-    while (WiFi.status() != WL_CONNECTED && attempt < 100)
-    {
-        delay(100);
-        message += ".";
-        app["sync_message"] = message;
-        app["clear"] = true;
-        attempt++;
-    }
-
-    // Update the network_status: 1
-    // meaning it is connected
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        // network status 1
-        app["network"]["IP"] = WiFi.localIP().toString();
-        app["network"]["ssid"] = ssid;
-        app["network"]["status"] = 1;
-
-        // print info
-        app["sync_message"] = format("Connected - %s, %s\n", ssid, WiFi.localIP().toString().c_str());
-        app["clear"] = true;
-
-        return true;
-    }
-    else
-    {
-        _log("Failed to connect to WiFi. Please check your credentials.\n");
-
-        //
-        app["sync_error"] = format("Failed to connect to %s", ssid);
-        app["sync_state"] = SYNC_ERROR;
-        app["clear"] = true;
-
-        // drop the association only
-        // sync_start still retries the remaining saved networks
-        // the final sync_stop powers down the radio
-        WiFi.disconnect();
-
-        return false; // Failed to connect
-    }
-}
 
 // ---- device HTTP transport (the SyncCore seam) ------------------------------
 // Real device implementation over HTTPClient. The emulator provides its own

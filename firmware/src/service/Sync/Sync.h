@@ -22,6 +22,5 @@ void sync_loop();
 
 // SYNC PROCESS
 void sync_start();
-bool sync_connect_wifi(JsonDocument &app, const char *ssid, const char *password);
 void sync_stop();
 void sync_send();
