@@ -56,6 +56,11 @@ static SyncHttp do_request(const String &url, const std::string *postBody)
     return r;
 }
 
+// No persistent TLS client to free on the host - libcurl's handle pool handles
+// reuse - so this is a no-op. It exists because the device has one and the
+// shared code calls it before a big request.
+void sync_http_close() {}
+
 SyncHttp sync_http_get(const String &url)
 {
     return do_request(url, nullptr);

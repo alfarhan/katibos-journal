@@ -45,7 +45,17 @@ static bool recovery_painted = false;
 // editor shortcut overlay (Ctrl+/) — a modal drawn over the page
 static bool help_overlay = false;
 static bool help_painted = false;
+
+// After an AI proofread pass ends, a small panel says so and stays until the
+// writer presses a key - the 4s status flash is easy to miss, and the pointer to
+// _backup.txt is the only route back to the pre-correction text. Drawn by the
+// editor; the document itself is never touched.
+static bool ai_notice = false;
+static bool ai_notice_painted = false;
+static String ai_notice_line;
+static bool ai_notice_ok = false;
 void WP_render_recovery(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8);
+void WP_render_ai_notice(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8);
 
 
 // Text alignment (config "text_align"). AUTO follows each line's base direction
@@ -304,6 +314,20 @@ void WP_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         return;
     }
 
+    // AI proofread result: paint once over the text, hold until a key dismisses.
+    if (ai_notice)
+    {
+        if (!ai_notice_painted)
+        {
+            WP_render_ai_notice(display, u8);
+            ai_notice_painted = true;
+            needsDisplay = true;
+        }
+        else
+            needsDisplay = false;
+        return;
+    }
+
     // Editor shortcut overlay (Ctrl+/): paint once, hold until a key dismisses it.
     if (help_overlay)
     {
@@ -334,6 +358,22 @@ void WP_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
                 Editor::getInstance().pageChanged = true; // force a full redraw
             }
             app["sync_reload"] = -1; // one-shot: applied or skipped
+        }
+
+        // Ctrl+G finished: raise the notice once, on the transition out of
+        // AI_RUNNING, so it appears whether the pass succeeded or failed.
+        {
+            static int ai_prev = AI_IDLE;
+            int st = app["ai_state"] | AI_IDLE;
+            if (ai_prev == AI_RUNNING && (st == AI_DONE || st == AI_ERROR))
+            {
+                ai_notice = true;
+                ai_notice_painted = false;
+                ai_notice_ok = (st == AI_DONE);
+                ai_notice_line = app["ai_message"].as<String>();
+                clear_background = true;
+            }
+            ai_prev = st;
         }
 
         // Ctrl+G rewrote the whole file underneath us, so the editor's window and
@@ -1074,6 +1114,54 @@ void WP_render_status(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 }
 
 // Full-screen modal shown at boot when unsaved text was recovered.
+// Result of an AI proofread pass, over the (already replaced) text. Says what
+// happened and, on success, where the pre-correction copy went - Ctrl+Z cannot
+// undo a whole-file replace, so the backup is the only way back.
+void WP_render_ai_notice(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
+{
+    const int bx = 30, by = 96, bw = 340, bh = 108;
+    RLCD_drawWindow(display, u8, bx, by, bw, bh, ai_notice_ok ? "AI PROOFREAD" : "AI PROOFREAD FAILED");
+
+    u8->setFont(u8g2_font_profont17_tf);
+    const int xl = bx + 16;
+
+    if (ai_notice_ok)
+    {
+        u8->setCursor(xl, by + 52);
+        u8->print("Done. Your text has been replaced.");
+        u8->setCursor(xl, by + 74);
+        u8->print("Original kept in _backup.txt");
+    }
+    else
+    {
+        // the failure reason, wrapped over two lines if it needs it
+        String msg = ai_notice_line;
+        msg.trim();
+        if (msg.isEmpty())
+            msg = "Could not reach the AI.";
+        const int maxCh = 33;
+        if ((int)msg.length() <= maxCh)
+        {
+            u8->setCursor(xl, by + 52);
+            u8->print(msg.c_str());
+        }
+        else
+        {
+            int cut = maxCh;
+            for (int i = maxCh; i > 8; i--)
+                if (msg[i] == ' ') { cut = i; break; }
+            u8->setCursor(xl, by + 52);
+            u8->print(msg.substring(0, cut).c_str());
+            u8->setCursor(xl, by + 74);
+            u8->print(capUtf8(msg.substring(cut + 1), maxCh).c_str());
+        }
+    }
+
+    static const RLCD_Hint HINTS[] = {{"ANY KEY", "CONTINUE"}};
+    RLCD_drawHintBar(display, u8, bx + (bw - RLCD_hintBarWidth(u8, RLCD_HINTS(HINTS))) / 2,
+                     by + bh + 30, RLCD_HINTS(HINTS));
+}
+
 void WP_render_recovery(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
     display->clearDisplay();
@@ -1204,6 +1292,17 @@ void WP_keyboard(int key, bool pressed, int index)
         recovery_prompt = false;
         clear_background = true;
         return;
+    }
+
+    // The AI notice is dismissed by any key. Unlike the help overlay it does NOT
+    // swallow the keystroke - a writer reaching for the next word should not lose
+    // that character to a notification.
+    if (ai_notice)
+    {
+        ai_notice = false;
+        ai_notice_painted = false;
+        Editor::getInstance().pageChanged = true; // full wipe of the panel
+        // fall through: the key still does whatever it normally does
     }
 
     // Editor shortcut overlay (Ctrl+/) owns the keyboard: any key dismisses it
