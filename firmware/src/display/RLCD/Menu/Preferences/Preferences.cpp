@@ -8,7 +8,8 @@
 // One consolidated Preferences screen: behavior toggles/values grouped by
 // section. Editor/display rows cycle in place (the editor re-reads these config
 // keys on entry, so we only write them here); the heavier ones (keyboard layout,
-// time zone, sync provider, about) drill into their existing screens.
+// time zone, sync provider) drill into their existing screens. About is not
+// here - it's a card of its own on the Settings grid.
 enum
 {
     R_HEAD = 0, // non-selectable section header
@@ -19,7 +20,6 @@ enum
     R_LAYOUT,
     R_PROV,
     R_FACTORY,
-    R_ABOUT,
 };
 
 
@@ -41,7 +41,6 @@ static const PRow ROWS[] = {
     {R_PROV, "Sync provider"},
     {R_HEAD, "SYSTEM"},
     {R_FACTORY, "Factory reset"},
-    {R_ABOUT, "About"},
 };
 static const int NROWS = sizeof(ROWS) / sizeof(ROWS[0]);
 
@@ -54,7 +53,7 @@ static const char *FLOW_LBL[] = {"Top", "Middle", "Bottom"};
 static bool isSel(int i) { return ROWS[i].type != R_HEAD; }
 static bool isDrill(int t)
 {
-    return t == R_LAYOUT || t == R_PROV || t == R_ABOUT || t == R_FACTORY;
+    return t == R_LAYOUT || t == R_PROV || t == R_FACTORY;
 }
 
 // current value shown on the right of a row (empty for drill rows w/o a value)
@@ -112,7 +111,6 @@ static void drill(JsonDocument &app, int type)
     case R_LAYOUT: app["menu"]["state"] = MENU_LAYOUT; break;
     case R_PROV: app["menu"]["state"] = MENU_SYNCPROV; break;
     case R_FACTORY: app["menu"]["state"] = MENU_FACTORY; break;
-    case R_ABOUT: app["menu"]["state"] = MENU_ABOUT; break;
     }
 }
 

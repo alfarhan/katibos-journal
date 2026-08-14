@@ -38,9 +38,11 @@ Waveshare enumerates as native USB-CDC (`ARDUINO_USB_CDC_ON_BOOT`); it's BLE-LE 
 
 ## Menu keys
 
-One letter per destination, the same everywhere it's handled (file list, Settings grid, Help): **P** Preferences · **L** Language · **W** Wi-Fi · **S** Sync · **D** USB Drive · **U** Update · **H** Help · **K** Keyboard (BLE builds only). File list: `ENT` open · `R` rename · `X` delete · `N` new · `←/→` switch tab. From the editor, **Ctrl+,** opens Preferences and **Ctrl+.** the Settings tab (both via a one-shot `menu.goto` that `Menu_setup` consumes).
+One letter per destination, the same everywhere it's handled (file list, Settings grid, Help): **P** Preferences · **L** Language · **W** Wi-Fi · **S** Sync · **D** USB Drive · **U** Update · **H** Help · **A** About · **K** Keyboard (BLE builds only). File list: `ENT` open · `R` rename · `X` delete · `N` new · `←/→` switch tab. From the editor, **Ctrl+,** opens Preferences and **Ctrl+.** the Settings tab (both via a one-shot `menu.goto` that `Menu_setup` consumes).
 
-Two traps this key map already walked into: a screen's own back key shadows a list letter (`B` used to eat `[B] Belgian` in Language — Esc/Left are the back keys there now), and the file list's `X`-for-delete exists so `D` can stay the global USB Drive jump. Keep `Help.cpp`'s tables in sync with the handlers — they are the only user-facing documentation of these keys.
+Two traps this key map already walked into: a screen's own back key shadows a list letter (`B` used to eat `[B] Belgian` in Language — Esc/Left are the back keys there now), and the file list's `X`-for-delete exists so `D` can stay the global USB Drive jump. Keep `Help.cpp`'s tables in sync with the handlers — they are the only user-facing documentation of these keys, and its row pitch is set by the JUMP column clearing the callout box at y=228 (10 rows on a BLE build), so adding a destination means re-checking that.
+
+The Settings grid shows each card's key by **underlining that letter in the card's own name** (`drawKeyedLabel`) instead of printing the key separately — so every card's key must actually occur in its label, matched case-insensitively on the first hit (`D` → "USB **D**rive", not the U). Language, Time zone and Sync provider are rows inside Preferences; About is a card of its own on the grid, since it's a destination rather than a setting.
 
 ## Cutting a release
 

@@ -74,6 +74,7 @@ static const HelpLine MENU_RIGHT[] = {
 #endif
     {"U", "Update", false},
     {"H", "Help", false},
+    {"A", "About", false},
 };
 
 #define N(a) ((int)(sizeof(a) / sizeof(a[0])))
@@ -142,9 +143,10 @@ void Help_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     Menu_drawHeader(display, u8, "HELP");
 
     u8->setFont(u8g2_font_profont17_tf);
-    // roomier rows (the menu help is short, so spread it out and balance both
-    // columns one-per-row). Single-letter right keys sit close to their labels.
-    const int y0 = 56, pitch = 20;
+    // Pitch is set by the JUMP column, the taller of the two: its last row has to
+    // clear the callout box at y=228 (10 rows on a BLE build). Anything roomier
+    // and About lands on top of the box.
+    const int y0 = 54, pitch = 18;
     drawColumn(display, u8, MENU_LEFT, N(MENU_LEFT), 8, 194, 12, y0, pitch);
     drawColumn(display, u8, MENU_RIGHT, N(MENU_RIGHT), 204, 396, 208, y0, pitch);
 
@@ -180,6 +182,7 @@ void Help_keyboard(int key)
         app["menu"]["state"] = MENU_PREFS;
         return;
     }
+    if (key == 'A' || key == 'a') { app["menu"]["state"] = MENU_ABOUT; return; }
     if (key == 'L' || key == 'l') { app["menu"]["state"] = MENU_LAYOUT; return; }
     if (key == 'W' || key == 'w') { app["menu"]["state"] = MENU_WIFI; return; }
     if (key == 'D' || key == 'd') { app["menu"]["state"] = MENU_STORAGE; return; }

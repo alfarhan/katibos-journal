@@ -4,7 +4,7 @@
 #define VERSION "2.0.0709"
 
 // katibOS layer version (menu/UX redesign on top of the base firmware)
-#define KATIBOS_VERSION "1.6.0"
+#define KATIBOS_VERSION "1.6.1"
 
 // Human-readable hardware target name; overridden per-env in platformio.ini
 #ifndef BOARD_NAME

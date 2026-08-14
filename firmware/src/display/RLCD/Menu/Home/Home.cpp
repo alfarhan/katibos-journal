@@ -275,6 +275,7 @@ void Home_keyboard(char key)
     if (key == 'W' || key == 'w') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_WIFI; return; }
     if (key == 'D' || key == 'd') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_STORAGE; return; }
     if (key == 'H' || key == 'h') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_HELP; return; }
+    if (key == 'A' || key == 'a') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_ABOUT; return; }
 #ifdef USE_BLE_KEYBOARD_HOST
     if (key == 'K' || key == 'k') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_BLUETOOTH; return; }
 #endif

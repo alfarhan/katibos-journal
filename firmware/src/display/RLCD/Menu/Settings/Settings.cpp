@@ -29,7 +29,8 @@ static int buildList(int *ids)
 {
     JsonDocument &app = status();
     int n = 0;
-    // Language, Time zone, Sync provider and About now live in Preferences.
+    // Language, Time zone and Sync provider live in Preferences; About is a card
+    // of its own here (it's a destination, not a setting).
     ids[n++] = ACT_PREFS;
     ids[n++] = ACT_WIFI;
     // Listed when a Drive URL is set OR the provider is git (git syncs via
@@ -43,6 +44,7 @@ static int buildList(int *ids)
     ids[n++] = ACT_DRIVE;
     ids[n++] = ACT_UPDATE; // always available via built-in fallback URL
     ids[n++] = ACT_HELP;
+    ids[n++] = ACT_ABOUT;
     return n;
 }
 
@@ -69,24 +71,58 @@ static const char *actionLabel(int act)
     return "";
 }
 
-// The single-key jump for a row (Settings_keyboard's fast-paths), shown on the
-// right of the row the way a menu shows its shortcut - so the keys get learned
-// by passing over them instead of only from the help screen.
-static const char *actionKey(int id)
+// The single-key jump for a card (Settings_keyboard's fast-paths). It is shown by
+// underlining that letter in the card's own name rather than printing the key
+// separately - the name already contains it, so the shortcut gets learned by
+// reading the label. Every key here MUST appear in its label (case-insensitive).
+static char actionKey(int id)
 {
     switch (id)
     {
-    case ACT_PREFS: return "P";
-    case ACT_WIFI: return "W";
-    case ACT_SYNC: return "S";
+    case ACT_PREFS: return 'P';
+    case ACT_WIFI: return 'W';
+    case ACT_SYNC: return 'S';
 #ifdef USE_BLE_KEYBOARD_HOST
-    case ACT_BTKB: return "K";
+    case ACT_BTKB: return 'K';
 #endif
-    case ACT_DRIVE: return "D";
-    case ACT_HELP: return "H";
-    case ACT_UPDATE: return "U";
+    case ACT_DRIVE: return 'D'; // "USB Drive" - the D of Drive, not the USB
+    case ACT_HELP: return 'H';
+    case ACT_UPDATE: return 'U';
+    case ACT_ABOUT: return 'A';
     }
-    return "";
+    return 0;
+}
+
+// Draw a card label with its shortcut letter underlined. Returns nothing; the
+// caller has already positioned x for a centered label. The underline is placed
+// by measuring the text before the letter, so it works in any font width.
+static void drawKeyedLabel(ST7305_4p2_BW_DisplayDriver *d, U8G2_FOR_ST73XX *u8,
+                           int x, int baseline, const char *label, char key, uint16_t ink)
+{
+    u8->setCursor(x, baseline);
+    u8->print(label);
+    if (!key)
+        return;
+
+    int at = -1;
+    for (int i = 0; label[i]; i++)
+    {
+        char c = label[i] >= 'a' && label[i] <= 'z' ? label[i] - 32 : label[i];
+        if (c == key) { at = i; break; }
+    }
+    if (at < 0)
+        return; // key not in the label - draw nothing rather than a wrong mark
+
+    char head[24];
+    int n = at < (int)sizeof(head) - 1 ? at : (int)sizeof(head) - 1;
+    for (int i = 0; i < n; i++)
+        head[i] = label[i];
+    head[n] = 0;
+    char one[2] = {label[at], 0};
+
+    int hx = x + u8->getUTF8Width(head);
+    int w = u8->getUTF8Width(one);
+    d->drawLine(hx, baseline + 2, hx + w - 2, baseline + 2, ink);
 }
 
 // ---- card icons -----------------------------------------------------------
@@ -165,6 +201,15 @@ static void iconHelp(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
     d->drawFilledRectangle(x + 12, y + 22, x + 16, y + 26, ink);
 }
 
+// The device itself, the same deck-with-a-screen mark the About screen draws
+// large and the title bar carries small.
+static void iconAbout(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+{
+    d->drawRectangle(x + 3, y + 2, x + 25, y + 26, ink);
+    d->drawRectangle(x + 7, y + 6, x + 21, y + 16, ink);   // screen
+    d->drawFilledRectangle(x + 9, y + 20, x + 19, y + 22, ink); // deck
+}
+
 static void drawActionIcon(ST7305_4p2_BW_DisplayDriver *d, int act, int x, int y, uint16_t ink)
 {
     switch (act)
@@ -178,6 +223,7 @@ static void drawActionIcon(ST7305_4p2_BW_DisplayDriver *d, int act, int x, int y
     case ACT_DRIVE: iconDrive(d, x, y, ink); break;
     case ACT_UPDATE: iconUpdate(d, x, y, ink); break;
     case ACT_HELP: iconHelp(d, x, y, ink); break;
+    case ACT_ABOUT: iconAbout(d, x, y, ink); break;
     }
 }
 
@@ -222,17 +268,24 @@ void Settings_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     int ids[12];
     int n = buildList(ids);
 
-    // Settings as a grid of tiles, three to a row: icon, name, and the key that
-    // opens it. Each tile is a small window (shadow + frame); the focused one
-    // fills black, the same inversion the file list and the hint chips use. The
-    // tiles carry their own keys, so this screen needs no footer hint bar.
+    // Settings as a grid of tiles, three to a row: an icon over the name, with
+    // the name's shortcut letter underlined. Each tile is a small window (shadow
+    // + frame); the focused one fills black, the same inversion the file list and
+    // the hint chips use. The tiles carry their own keys, so this screen needs no
+    // footer hint bar.
     const int MX = 10, GAP = 8, COLS = 3;
     const int top = 64, bottom = 292;
+    const int ICON = 28, CAP = 12, ICON_GAP = 6; // glyph cap height / icon-to-text gap
     int rows = (n + COLS - 1) / COLS;
     int cardW = (400 - 2 * MX - (COLS - 1) * GAP) / COLS;
     int cardH = (bottom - top - (rows - 1) * GAP) / rows;
-    bool tall = cardH >= 90;
 
+    // icon + gap + one text line, centered as one block however tall the card is
+    int blockY = (cardH - (ICON + ICON_GAP + CAP)) / 2;
+    if (blockY < 4)
+        blockY = 4;
+
+    u8->setFont(u8g2_font_profont17_tf);
     for (int i = 0; i < n; i++)
     {
         int cx = MX + (i % COLS) * (cardW + GAP);
@@ -244,7 +297,7 @@ void Settings_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             display->drawFilledRectangle(cx + 1, cy + 1, cx + cardW - 1, cy + cardH - 1, 1);
 
         uint16_t ink = focused ? ST7305_COLOR_WHITE : ST7305_COLOR_BLACK;
-        drawActionIcon(display, ids[i], cx + (cardW - 28) / 2, cy + (tall ? 14 : 4), ink);
+        drawActionIcon(display, ids[i], cx + (cardW - ICON) / 2, cy + blockY, ink);
 
         if (focused)
         {
@@ -252,17 +305,9 @@ void Settings_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             u8->setBackgroundColor(ST7305_COLOR_BLACK);
         }
 
-        u8->setFont(u8g2_font_profont17_tf);
         const char *label = actionLabel(ids[i]);
-        u8->setCursor(cx + (cardW - u8->getUTF8Width(label)) / 2, cy + cardH - (tall ? 34 : 22));
-        u8->print(label);
-
-        const char *jump = actionKey(ids[i]);
-        if (*jump)
-        {
-            u8->setCursor(cx + (cardW - u8->getUTF8Width(jump)) / 2, cy + cardH - (tall ? 12 : 6));
-            u8->print(jump);
-        }
+        drawKeyedLabel(display, u8, cx + (cardW - u8->getUTF8Width(label)) / 2,
+                       cy + blockY + ICON + ICON_GAP + CAP, label, actionKey(ids[i]), ink);
 
         if (focused)
         {
@@ -328,8 +373,9 @@ void Settings_keyboard(int key)
         return;
     }
 
-    // letter fast-paths (Language/Time zone/Sync provider/About moved to Preferences)
+    // letter fast-paths (Language / Time zone / Sync provider live in Preferences)
     if (key == 'P' || key == 'p') dispatch(ACT_PREFS);
+    else if (key == 'A' || key == 'a') dispatch(ACT_ABOUT);
     else if (key == 'W' || key == 'w') dispatch(ACT_WIFI);
     else if (key == 'S' || key == 's') dispatch(ACT_SYNC);
 #ifdef USE_BLE_KEYBOARD_HOST
