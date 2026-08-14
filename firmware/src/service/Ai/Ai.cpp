@@ -13,21 +13,22 @@
 
 static const char *AI_DEFAULT_MODEL = "gemini-2.5-flash";
 
-// The instruction is deliberately narrow. This is a writing device: the model is
-// here to fix misspellings, not to edit prose. Arabic is the risky case - models
-// love to normalize alef/hamza forms and to add or drop harakat, which silently
-// rewrites the author's choices - so that is forbidden explicitly.
+// Fouad's prompt, verbatim - it is the specification of what this feature does,
+// so it lives here in his words rather than being paraphrased. Note what it asks
+// for: hamza forms and taa-marbuta/haa ARE to be corrected (they are genuine
+// Arabic orthography errors), and grammar and punctuation too - so this is a
+// proofread, not a spell-check. What it forbids is rewriting: no rephrasing, no
+// swapping one of his words for another.
 static const char *AI_PROMPT =
-    "Fix ONLY misspelled words in the text below. Obey every rule:\n"
-    "1. Do not rephrase, reorder, translate, summarize or improve anything.\n"
-    "2. Keep every line break, blank line, space and punctuation mark as-is.\n"
-    "3. For Arabic: never change alef/hamza forms, never add or remove harakat,\n"
-    "   never switch a word for a synonym. Fix only genuine spelling errors.\n"
-    "4. Keep the original language of every word. Do not translate.\n"
-    "5. Reply with the corrected text ONLY - no preamble, no explanation, no\n"
-    "   markdown fences, no quotes around it.\n"
+    "[المطلوب: تدقيق لغوي ونحوي فقط دون تصرف]\n"
+    "قم بتصحيح الأخطاء النحوية، والإملائية (مثل: الهمزات، والتاء المربوطة والهاء)، "
+    "وعلامات الترقيم في النص التالي.\n"
+    "شروط صارمة:\n"
     "\n"
-    "TEXT:\n";
+    "1. ممنوع إعادة صياغة الجمل أو تغيير كاتب النص، حتى لو كانت الصياغة تبدو غريبة، "
+    "طالما أنها صحيحة نحوياً.\n"
+    "2. احتفظ بأسلوبي وكلماتي كما هي تماماً دون استبدال مفردة بأخرى.\n"
+    "3. اعرض النص المصحح كاملاً فقط.\n";
 
 // ---- progress ---------------------------------------------------------------
 // Nothing renders while this pass holds the background core, so each stage marks
@@ -208,8 +209,11 @@ static void ai_run()
     String payload;
     {
         JsonDocument body;
-        JsonObject part = body["contents"][0]["parts"][0].to<JsonObject>();
-        part["text"] = String(AI_PROMPT) + original;
+        // Prompt and document as two separate parts, not one concatenated string:
+        // there is then no in-band "TEXT:" marker for the document itself to
+        // collide with, and the reply parser has an exact boundary.
+        body["contents"][0]["parts"][0]["text"] = AI_PROMPT;
+        body["contents"][0]["parts"][1]["text"] = original;
         // temperature 0: we want the same correction every time, not creativity.
         body["generationConfig"]["temperature"] = 0;
         serializeJson(body, payload);

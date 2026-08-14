@@ -29,7 +29,7 @@ static const HelpLine EDIT_LEFT[] = {
     {"Del", "Delete fwd", false},
     {"^S", "Save", false},
     {"^U", "Sync file", false},
-    {"^G", "AI spelling", false},
+    {"^G", "AI proofread", false},
     {"^Sh+U", "Sync all", false},
     {"^Space", "Layout", false},
     {"^H", "Status bar", false},
