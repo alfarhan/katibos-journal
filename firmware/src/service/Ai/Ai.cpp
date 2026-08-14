@@ -11,7 +11,7 @@
 #include "service/WifiEntry/WifiEntry.h" // wifi_config_load
 #endif
 
-static const char *AI_DEFAULT_MODEL = "gemini-2.5-flash";
+static const char *AI_DEFAULT_MODEL = "gemini-3.1-pro";
 
 // Fouad's prompt, verbatim - it is the specification of what this feature does,
 // so it lives here in his words rather than being paraphrased. Note what it asks
