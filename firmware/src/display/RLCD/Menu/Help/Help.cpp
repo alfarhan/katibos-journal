@@ -62,6 +62,7 @@ static const HelpLine MENU_LEFT[] = {
     {"N", "New file", false},
     {"R", "Rename", false},
     {"X", "Delete", false},
+    {"T", "Restart", false},
 };
 static const HelpLine MENU_RIGHT[] = {
     HDR("JUMP (files/settings)"),

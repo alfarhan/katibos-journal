@@ -4,6 +4,8 @@
 #include "display/display.h"
 #include "display/RLCD/display_RLCD.h"
 #include "display/RLCD/Menu/FileList/Pagination.h"
+#include "service/Editor/Editor.h"
+#include "service/Updater/Ota.h" // ota_reboot()
 
 enum
 {
@@ -18,8 +20,15 @@ enum
     ACT_DRIVE,
     ACT_UPDATE,
     ACT_HELP,
-    ACT_ABOUT
+    ACT_ABOUT,
+    ACT_RESTART
 };
+
+// T ("resTart") asks to restart, behind a confirm: a boot costs a few seconds
+// and, on a BLE build, re-pairing the keyboard. Not R - that is rename on the
+// Files tab, and one letter meaning two things per tab is the collision this key
+// map has been bitten by before.
+static bool restart_confirm = false;
 
 static int g_cursor = 0;
 
@@ -45,6 +54,7 @@ static int buildList(int *ids)
     ids[n++] = ACT_UPDATE; // always available via built-in fallback URL
     ids[n++] = ACT_HELP;
     ids[n++] = ACT_ABOUT;
+    ids[n++] = ACT_RESTART;
     return n;
 }
 
@@ -67,6 +77,7 @@ static const char *actionLabel(int act)
     case ACT_UPDATE: return "Update";
     case ACT_HELP: return "Help";
     case ACT_ABOUT: return "About";
+    case ACT_RESTART: return "Restart";
     }
     return "";
 }
@@ -89,6 +100,7 @@ static char actionKey(int id)
     case ACT_HELP: return 'H';
     case ACT_UPDATE: return 'U';
     case ACT_ABOUT: return 'A';
+    case ACT_RESTART: return 'T'; // "resTart" - R is rename on the Files tab
     }
     return 0;
 }
@@ -210,6 +222,17 @@ static void iconAbout(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink
     d->drawFilledRectangle(x + 9, y + 20, x + 19, y + 22, ink); // deck
 }
 
+// A circle broken at the top right with an arrowhead on the loose end - the
+// restart mark. drawCircle then a cleared notch, because there is no arc.
+static void iconRestart(ST7305_4p2_BW_DisplayDriver *d, int x, int y, uint16_t ink)
+{
+    d->drawCircle(x + 14, y + 15, 9, ink);
+    d->drawCircle(x + 14, y + 15, 8, ink); // 2px stroke, so it reads at this size
+    // knock the gap out of the top-right quadrant
+    d->drawFilledRectangle(x + 14, y + 3, x + 26, y + 9, ink == ST7305_COLOR_WHITE ? ST7305_COLOR_BLACK : ST7305_COLOR_WHITE);
+    d->drawFilledTriangle(x + 12, y + 2, x + 12, y + 10, x + 19, y + 6, ink);
+}
+
 static void drawActionIcon(ST7305_4p2_BW_DisplayDriver *d, int act, int x, int y, uint16_t ink)
 {
     switch (act)
@@ -224,6 +247,7 @@ static void drawActionIcon(ST7305_4p2_BW_DisplayDriver *d, int act, int x, int y
     case ACT_UPDATE: iconUpdate(d, x, y, ink); break;
     case ACT_HELP: iconHelp(d, x, y, ink); break;
     case ACT_ABOUT: iconAbout(d, x, y, ink); break;
+    case ACT_RESTART: iconRestart(d, x, y, ink); break;
     }
 }
 
@@ -252,6 +276,7 @@ static void dispatch(int act)
     case ACT_UPDATE: app["menu"]["state"] = MENU_UPDATE; break;
     case ACT_HELP: app["menu"]["state"] = MENU_HELP; break;
     case ACT_ABOUT: app["menu"]["state"] = MENU_ABOUT; break;
+    case ACT_RESTART: restart_confirm = true; Menu_clear(); break;
     }
 }
 
@@ -263,6 +288,23 @@ void Settings_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
 void Settings_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
+    if (restart_confirm)
+    {
+        Menu_drawTabs(display, u8, 1);
+        const int bx = 40, by = 96, bw = 320, bh = 104;
+        RLCD_drawWindow(display, u8, bx, by, bw, bh, "RESTART");
+        u8->setFont(u8g2_font_profont17_tf);
+        u8->setCursor(bx + 16, by + 50);
+        u8->print("Restart the device?");
+        u8->setCursor(bx + 16, by + 74);
+        u8->print("Any open file is saved first.");
+
+        static const RLCD_Hint HINTS[] = {{"Y", "RESTART"}, {"ANY", "CANCEL"}};
+        RLCD_drawHintBar(display, u8, bx + (bw - RLCD_hintBarWidth(u8, RLCD_HINTS(HINTS))) / 2,
+                         by + bh + 30, RLCD_HINTS(HINTS));
+        return;
+    }
+
     Menu_drawTabs(display, u8, 1);
 
     int ids[12];
@@ -320,6 +362,21 @@ void Settings_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 void Settings_keyboard(int key)
 {
     JsonDocument &app = status();
+
+    // While the confirm is up it owns every key: Y restarts, anything else backs
+    // out. Handled before the navigation keys so arrows can't move behind it.
+    if (restart_confirm)
+    {
+        restart_confirm = false;
+        Menu_clear();
+        if (key == 'Y' || key == 'y')
+        {
+            Editor::getInstance().saveFile();
+            _log("[settings] restart confirmed\n");
+            ota_reboot();
+        }
+        return;
+    }
     int ids[12];
     int n = buildList(ids);
 
@@ -376,6 +433,7 @@ void Settings_keyboard(int key)
     // letter fast-paths (Language / Time zone / Sync provider live in Preferences)
     if (key == 'P' || key == 'p') dispatch(ACT_PREFS);
     else if (key == 'A' || key == 'a') dispatch(ACT_ABOUT);
+    else if (key == 'T' || key == 't') dispatch(ACT_RESTART);
     else if (key == 'W' || key == 'w') dispatch(ACT_WIFI);
     else if (key == 'S' || key == 's') dispatch(ACT_SYNC);
 #ifdef USE_BLE_KEYBOARD_HOST

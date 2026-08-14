@@ -41,7 +41,7 @@ static const PRow ROWS[] = {
     {R_FLOW, "Text flow"},
     {R_STATUS, "Status bar"},
     {R_IDLE, "Power save"},
-    {R_SAVER, "Rest screen"},
+    {R_SAVER, "Screensaver"},
     {R_SLEEP, "Sleep"},
     {R_DEEP, "Shut down"},
     {R_HEAD, "INPUT"},
