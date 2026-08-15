@@ -19,6 +19,8 @@ void Menu_clear();
 static const NimBLEUUID UUID_HID_SERVICE((uint16_t)0x1812);
 static const NimBLEUUID UUID_PROTOCOL_MODE((uint16_t)0x2A4E);   // 0=Boot, 1=Report
 static const NimBLEUUID UUID_BOOT_KB_INPUT((uint16_t)0x2A22);   // 8-byte boot report
+static const NimBLEUUID UUID_GAP_SERVICE((uint16_t)0x1800);
+static const NimBLEUUID UUID_DEVICE_NAME((uint16_t)0x2A00);     // the keyboard's own name
 static const uint16_t APPEARANCE_KEYBOARD = 0x03C1;
 static const uint32_t DISCOVER_MS = 6000;
 
@@ -101,7 +103,11 @@ static void savedRemember(const NimBLEAddress &a, const String &name)
     int at = savedIndexOf(a);
     if (at >= 0)
     {
-        if (!name.isEmpty())
+        // Keep the name it was saved under. On an auto-reconnect the caller's
+        // idea of the name is app["ble"]["peer"], which still holds whichever
+        // keyboard connected last - so trusting it here relabels this entry
+        // with the other keyboard's name.
+        if (g_saved[at].name.isEmpty() && !name.isEmpty())
             g_saved[at].name = name;
     }
     else
@@ -246,6 +252,11 @@ class HostScanCallbacks : public NimBLEScanCallbacks
                  dev->getAddress().toString().c_str(), millis() - g_scanStart,
                  dev->getRSSI());
             g_target = dev->getAddress();
+            // Label the session with THIS keyboard's saved name; nobody else
+            // sets it on this path, so it would otherwise keep the last one's.
+            int si = savedIndexOf(g_target);
+            if (si >= 0 && !g_saved[si].name.isEmpty())
+                status()["ble"]["peer"] = g_saved[si].name;
             g_wantConnect = true;
             NimBLEDevice::getScan()->stop();
         }
@@ -376,6 +387,17 @@ static void buildDeviceList()
 
         NimBLEAddress a = d->getAddress();
         std::string nm = d->getName();
+
+        // A scan is the only place a keyboard states its own name, so correct
+        // any saved entry that carries the wrong one here.
+        int si = savedIndexOf(a);
+        if (si >= 0 && !nm.empty() && g_saved[si].name != String(nm.c_str()))
+        {
+            _log("[blehost] renaming saved %s to %s\n", a.toString().c_str(), nm.c_str());
+            g_saved[si].name = String(nm.c_str());
+            savedPublish();
+        }
+
         JsonObject o = arr.add<JsonObject>();
         o["name"] = nm.empty() ? String(a.toString().c_str()) : String(nm.c_str());
         o["addr"] = String(a.toString().c_str());
@@ -494,9 +516,37 @@ static void finishSetup()
     g_client = c;
     g_connected = true;
     memset(g_prevKeys, 0, sizeof(g_prevKeys));
+    // Ask the keyboard its own name over the link. A scan is the other place a
+    // name appears, but a CONNECTED keyboard does not advertise, so a scan can
+    // never correct the row you are actually using - and on an auto-reconnect
+    // nothing else here knows which keyboard this is.
+    String name = status()["ble"]["peer"].as<String>();
+    if (auto *gap = c->getService(UUID_GAP_SERVICE))
+    {
+        if (auto *dn = gap->getCharacteristic(UUID_DEVICE_NAME))
+        {
+            std::string v = dn->readValue();
+            if (!v.empty())
+            {
+                name = String(v.c_str());
+                BLE_STEP("name from device: %s", name.c_str());
+            }
+            else
+                BLE_STEP("device name read was empty");
+        }
+        else
+            BLE_STEP("no device-name characteristic (0x2A00)");
+    }
+    else
+        BLE_STEP("no GAP service (0x1800)");
+    status()["ble"]["peer"] = name;
+
     // Saved only once it actually works: a keyboard that pairs but never reaches
     // this point has nothing worth remembering.
-    savedRemember(g_target, status()["ble"]["peer"].as<String>());
+    int si = savedIndexOf(g_target);
+    if (si >= 0 && !name.isEmpty() && g_saved[si].name != name)
+        g_saved[si].name = name; // authoritative: it came from the keyboard itself
+    savedRemember(g_target, name);
     status()["ble"]["connected"] = true;
     BLE_STEP("connected, %d report(s)", subs);
     g_connecting = false;
