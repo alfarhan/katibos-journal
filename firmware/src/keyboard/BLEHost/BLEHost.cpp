@@ -277,6 +277,16 @@ class HostClientCallbacks : public NimBLEClientCallbacks
         g_linkedThisAttempt = true;
         g_wantSecure = true;
     }
+    // Keyboards ask for the parameters that suit their power budget. Accept
+    // them and say what they were: our numbers are a starting position, and the
+    // peripheral knows its own radio better than we do.
+    bool onConnParamsUpdateRequest(NimBLEClient *c, const ble_gap_upd_params *p) override
+    {
+        if (p)
+            _log("[blehost] peer asks for interval %u-%u, latency %u, timeout %ums\n",
+                 p->itvl_min * 5 / 4, p->itvl_max * 5 / 4, p->latency, p->supervision_timeout * 10);
+        return true;
+    }
     void onConnectFail(NimBLEClient *c, int reason) override
     {
         _log("[blehost] connect failed (reason %d)\n", reason);
@@ -430,12 +440,17 @@ static void connectToKeyboard()
         c = NimBLEDevice::createClient(g_target);
     c->setClientCallbacks(&g_clientCB, false);
 
-    // HID keyboards (e.g. Logitech Keys-To-Go) drop the link within seconds if
-    // the central keeps its default connection params: they expect a short
-    // interval and a supervision timeout long enough to survive their slave
-    // latency. Negotiate keyboard-friendly params before connecting.
-    // Units: interval x1.25ms, timeout x10ms -> 15-30ms interval, 5s timeout.
-    c->setConnectionParams(12, 24, 0, 500);
+    // Keyboard-friendly link parameters. Units: interval x1.25ms, timeout x10ms
+    // -> 15-30ms interval, latency 30, 6s supervision timeout.
+    //
+    // Latency 30, not 0: a keyboard with nothing to say may skip that many
+    // connection events to save power, and with latency 0 every skipped event
+    // is a missed one - which is how a link that is merely idle dies of
+    // supervision timeout (reason 520) after a few quiet minutes. The timeout
+    // must outlast a full run of skipped events: (1+30) x 30ms x 2 = 1.9s, well
+    // inside 6s. A keyboard with keys to send ignores latency entirely and
+    // answers on the next event, so this costs nothing while typing.
+    c->setConnectionParams(12, 24, 30, 600);
 
     // Async: returns as soon as the request is queued. onConnect() then asks for
     // encryption and onAuthenticationComplete() releases the setup below, so the
