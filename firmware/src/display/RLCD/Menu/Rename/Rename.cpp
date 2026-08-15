@@ -9,6 +9,36 @@
 #include "service/Tools/TextUtil.h"
 #include "service/Bidi/Bidi.h"
 
+// The title is what sync uses as the remote filename (title + ".txt"), so this
+// is a filename limit, not just a display one.
+static const int TITLE_MAX = 64;
+static const int CARET_W = 10; // the '_' drawn after the text
+
+static int utf8Len(const char *s)
+{
+    int n = 0;
+    for (; *s; s++)
+        if (((unsigned char)*s & 0xC0) != 0x80)
+            n++;
+    return n;
+}
+
+// The field shows the TAIL of a long title, clipped by measured width rather
+// than a character count - typing here is append-only, so the end is the part
+// you need to see, and an Arabic glyph is not a Latin one's width.
+static String fieldTail(U8G2_FOR_ST73XX *u8, const char *s, int avail)
+{
+    String t = s;
+    while (t.length() && RLCD_shapedLabelWidth(u8, t.c_str(), false) > avail)
+    {
+        int k = 1;
+        while (k < (int)t.length() && ((unsigned char)t[k] & 0xC0) == 0x80)
+            k++;
+        t = t.substring(k);
+    }
+    return t;
+}
+
 void Rename_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
     // Start from an empty field; the current title is shown for reference and a
@@ -36,7 +66,8 @@ void Rename_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     // input box — a clear text field so it's obvious where typing lands
     const int bx = xl, by = 106, bw = 336, bh = 32;
     display->drawRectangle(bx, by, bx + bw, by + bh, 1);
-    int caretX = RLCD_drawShapedLabel(u8, bx + 10, by + 22, capUtf8(buffer_get(), 30).c_str(), false);
+    int caretX = RLCD_drawShapedLabel(u8, bx + 10, by + 22,
+                                      fieldTail(u8, buffer_get(), bw - 20 - CARET_W).c_str(), false);
     u8->setFont(u8g2_font_profont17_tf);
     u8->drawGlyph(bx + 10 + caretX, by + 22, '_');
 
@@ -77,7 +108,7 @@ void Rename_keyboard(int key)
         else
         {
             app["config"][format("title_manual_%d", fi)] = true;
-            app["config"][format("title_%d", fi)] = capUtf8(t, 28);
+            app["config"][format("title_%d", fi)] = capUtf8(t, TITLE_MAX);
         }
         config_save();
         buffer_clear();
@@ -111,6 +142,11 @@ void Rename_keyboard(int key)
     // real characters are ASCII (< 1000) or Arabic and beyond (>= 1536).
     else if (key >= 32 && key != 127 && (key < 1000 || key > 1199) && key <= 0xFFFF)
     {
+        if (utf8Len(buffer_get()) >= TITLE_MAX)
+        {
+            Menu_clear(); // full: refuse the key rather than cut it off at save
+            return;
+        }
         char enc[4];
         int len = bidi::utf8Encode((uint16_t)key, enc);
         for (int i = 0; i < len; i++)

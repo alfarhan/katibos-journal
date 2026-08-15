@@ -3,6 +3,7 @@
 #include "app/app.h"
 #include "display/display.h"
 #include "service/Tools/Tools.h"
+#include "service/Tools/TextUtil.h"
 
 static const int SLOT_MAX = 100;
 
@@ -207,7 +208,10 @@ bool sync_upload_index(JsonDocument &app, int index, const String &baseUrl)
         {
             // a different note already uses this name → disambiguate, baking the
             // suffix into the title so device/Drive/vault all match.
-            title = title + "-" + String(index);
+            // Trim the stem first: the suffix must survive the 64-char title cap
+            // Rename enforces, or a maxed-out title would grow past it here.
+            String sfx = "-" + String(index);
+            title = capUtf8(title, 64 - sfx.length()) + sfx;
             app["config"][format("title_%d", index)] = title;
             app["config"][format("title_manual_%d", index)] = true;
             nameTxt = title + ".txt";
