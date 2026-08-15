@@ -498,7 +498,21 @@ int keyboard_keypad_68_get_key(keypadEvent e)
     // the locale tables instead of returning the hardcoded US character
     JsonDocument &app = status();
     String locale = app["config"]["keyboard_layout"].as<String>();
-    if (locale.length() > 0 && locale != "US" && locale != "null")
+    if (locale == "INT")
+    {
+        // International IS the US layout - the layer table already produced the
+        // right character, only the accent folding is missing. Feed the RESOLVED
+        // character to the filter rather than going through key_hid: the dead
+        // keys live on punctuation ( ' " ` ~ ^ ), which has no key_hid entry,
+        // and half of them exist only on the LOWER/SHIFT layers a physical-key
+        // lookup cannot see. Press events only - a release must not disturb the
+        // pending precursor. (Ported from upstream mcu 65ad2c5; the serial and
+        // BLE paths never had this bug, since they call keyboard_keycode_ascii,
+        // which applies the filter itself.)
+        if (e.bit.EVENT == KEY_JUST_PRESSED && key >= 32 && key <= 126)
+            key = keyboard_precursor_filter(key);
+    }
+    else if (locale.length() > 0 && locale != "US" && locale != "null")
     {
         uint8_t hid = key_hid[e.bit.KEY];
         if (hid != 0)
