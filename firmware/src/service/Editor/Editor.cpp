@@ -112,11 +112,6 @@ void Editor::loadFile(String fileName)
         app["config"][format("wordcount_file_%d", idx)] = 0;
         app["config"][format("wordcount_buffer_%d", idx)] = 0;
         app["config"][format("edited_%d", idx)] = 0;
-        // Stats baseline starts at 0 for a brand-new file, so everything typed
-        // into it counts as words written today. (A file that pre-dates this
-        // feature has no baseline key and is instead seeded on first save
-        // without counting its existing content - see saveFile.)
-        app["config"][format("last_wc_%d", idx)] = 0;
         app["config"][format("caret_%d", idx)] = 0; // new file opens at the top
         config_save();
     }
@@ -1021,10 +1016,6 @@ void Editor::deleteFile()
     app["config"][format("wordcount_file_%d", file_index)] = 0;
     app["config"][format("wordcount_buffer_%d", file_index)] = 0;
     app["config"][format("edited_%d", file_index)] = 0;
-    // drop the stats baseline so a file later created in this slot has its first
-    // save counted as words written today (re-seeded fresh), not measured against
-    // the deleted file's count.
-    app["config"].remove(format("last_wc_%d", file_index));
     app["config"].remove(format("caret_%d", file_index)); // no resume into a deleted file
     app["config"].remove(format("synced_day_%d", file_index));
     config_save();

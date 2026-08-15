@@ -15,7 +15,6 @@ void _set_default_config()
 
     //
     app["config"]["sync"]["url"] = "";
-    app["config"]["ble"]["remote"] = "";
 
 
     //
