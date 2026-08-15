@@ -34,6 +34,17 @@ static NimBLEClient *g_client = nullptr;
 static NimBLEAddress g_target;      // address we're about to connect to
 static NimBLEAddress g_remembered;  // paired keyboard, null if none
 static volatile bool g_wantConnect = false;
+// The connect is a state machine driven by NimBLE's callbacks, not a straight
+// line of blocking calls: connect(), secureConnection() and service discovery
+// each wait on the peer, and a keyboard whose pairing key we no longer share
+// can leave secureConnection() parked forever - which froze the whole device,
+// since this all ran inline on the main loop task. Each step now returns
+// immediately and the next one is picked up by blehost_loop().
+static volatile bool g_wantSecure = false;   // link is up, ask for encryption
+static volatile bool g_wantSetup = false;    // encrypted, discover + subscribe
+static volatile bool g_connecting = false;   // an attempt is in flight
+static unsigned long g_connectStart = 0;
+static const unsigned long CONNECT_LIMIT_MS = 12000;
 static volatile bool g_scanDone = false;
 static volatile bool g_connected = false;
 static uint8_t g_prevKeys[6] = {0};
@@ -73,6 +84,28 @@ static bool inReport(const uint8_t *keys, uint8_t code)
 // the shared HID pipeline (locale, Arabic, shortcuts all handled there).
 static void onNotify(NimBLERemoteCharacteristic *chr, uint8_t *data, size_t len, bool isNotify)
 {
+    // Report shapes differ per keyboard - a NuPhy notifies on 0x2A4D even after
+    // being told to use boot protocol - so say what actually arrived. Empty
+    // frames are skipped (an idle keyboard streams them ~10/s and they would
+    // flush the cap before a real keystroke appeared) and the rest is capped:
+    // this runs on the BLE task, once per report.
+    static int seen = 0;
+    bool empty = true;
+    for (size_t i = 0; i < len && empty; i++)
+        if (data[i])
+            empty = false;
+    if (!empty && seen < 24)
+    {
+        seen++;
+        char hex[3 * 12 + 1];
+        size_t n = len < 12 ? len : 12;
+        for (size_t i = 0; i < n; i++)
+            snprintf(hex + i * 3, 4, "%02X ", data[i]);
+        hex[n * 3] = 0;
+        _log("[blehost] notify %s len=%u %s\n", chr->getUUID().toString().c_str(),
+             (unsigned)len, hex);
+    }
+
     if (len < 8)
         return; // consumer/media/vendor report - ignore for now
 
@@ -128,10 +161,26 @@ class HostScanCallbacks : public NimBLEScanCallbacks
 
 class HostClientCallbacks : public NimBLEClientCallbacks
 {
+    void onConnect(NimBLEClient *c) override
+    {
+        _log("[blehost] link up, requesting encryption\n");
+        g_wantSecure = true;
+    }
+    void onConnectFail(NimBLEClient *c, int reason) override
+    {
+        _log("[blehost] connect failed (reason %d)\n", reason);
+        g_connecting = false;
+        setStatus("Connect failed");
+        if (!g_remembered.isNull())
+            g_mode = MODE_RECONNECT;
+    }
     void onDisconnect(NimBLEClient *c, int reason) override
     {
-        _log("[blehost] disconnected (reason %d)\n", reason);
+        _log("[blehost] disconnected (reason %d) peer %s\n", reason,
+             c ? c->getPeerAddress().toString().c_str() : "?");
         g_connected = false;
+        g_connecting = false;
+        g_wantSecure = g_wantSetup = false;
         g_client = nullptr;
         memset(g_prevKeys, 0, sizeof(g_prevKeys));
         status()["ble"]["connected"] = false;
@@ -143,6 +192,10 @@ class HostClientCallbacks : public NimBLEClientCallbacks
     {
         _log("[blehost] auth: bonded=%s encrypted=%s\n",
              info.isBonded() ? "yes" : "no", info.isEncrypted() ? "yes" : "no");
+        if (info.isEncrypted())
+            g_wantSetup = true;
+        else
+            g_connecting = false; // let the loop's deadline clean this up
     }
 };
 
@@ -209,11 +262,20 @@ static void buildDeviceList()
     setStatus(arr.size() ? "Select a keyboard" : "No keyboards found");
 }
 
+// Every step below can block for seconds, all of it on the main loop task, and
+// this board loses its panic text with the USB-CDC console that dies alongside
+// it - so the trace has to say which step it was stuck in when it went.
+#define BLE_STEP(fmt, ...) _log("[blehost] +%lums " fmt "\n", millis() - t0, ##__VA_ARGS__)
+
 static void connectToKeyboard()
 {
+    unsigned long t0 = millis();
+    BLE_STEP("connect to %s", g_target.toString().c_str());
+
     NimBLEScan *s = NimBLEDevice::getScan();
     if (s->isScanning())
         s->stop();
+    BLE_STEP("scan stopped");
 
     NimBLEClient *c = NimBLEDevice::getClientByPeerAddress(g_target);
     if (!c)
@@ -227,22 +289,37 @@ static void connectToKeyboard()
     // Units: interval x1.25ms, timeout x10ms -> 15-30ms interval, 5s timeout.
     c->setConnectionParams(12, 24, 0, 500);
 
-    if (!c->connect(g_target))
+    // Async: returns as soon as the request is queued. onConnect() then asks for
+    // encryption and onAuthenticationComplete() releases the setup below, so the
+    // main loop keeps rendering and reading keys throughout.
+    g_client = c;
+    g_connecting = true;
+    g_connectStart = millis();
+    setStatus("Connecting...");
+    if (!c->connect(g_target, true, true))
     {
-        _log("[blehost] connect failed\n");
-        NimBLEDevice::deleteClient(c);
+        BLE_STEP("connect() request refused");
+        g_connecting = false;
+        g_client = nullptr;
         setStatus("Connect failed");
         if (!g_remembered.isNull())
-        {
             g_mode = MODE_RECONNECT;
-            startReconnectScan();
-        }
         return;
     }
+    BLE_STEP("connect() requested");
+}
 
-    c->secureConnection(); // bond/encrypt before touching the HID service
+// Runs once the link is encrypted: discovery and subscription only make sense
+// after bonding, and by then the peer is answering, so these are quick.
+static void finishSetup()
+{
+    unsigned long t0 = g_connectStart;
+    NimBLEClient *c = g_client;
+    if (!c)
+        return;
 
     NimBLERemoteService *hid = c->getService(UUID_HID_SERVICE);
+    BLE_STEP("HID service %s", hid ? "found" : "MISSING");
     if (!hid)
     {
         setStatus("No HID service");
@@ -258,20 +335,26 @@ static void connectToKeyboard()
     {
         uint8_t boot = 0;
         pm->writeValue(&boot, 1, false); // write without response
+        BLE_STEP("boot protocol written");
     }
 
+    // Subscribe to EVERY notifiable characteristic, not just the boot report.
+    // The protocol-mode write above is a write-without-response, so nothing
+    // confirms the keyboard honoured it - a keyboard that exposes 0x2A22 and
+    // then keeps notifying on its report-protocol characteristic leaves us
+    // subscribed to a channel it never uses, connected and deaf. onNotify
+    // filters by report shape, so extra subscriptions are harmless.
     int subs = 0;
-    // Prefer the boot keyboard input report; it's exactly what onNotify expects.
-    if (auto *bootIn = hid->getCharacteristic(UUID_BOOT_KB_INPUT))
-        if (bootIn->canNotify() && bootIn->subscribe(true, onNotify))
+    for (auto *ch : hid->getCharacteristics(true))
+    {
+        if (!ch->canNotify())
+            continue;
+        if (ch->subscribe(true, onNotify))
+        {
             subs++;
-
-    // Fallback: some keyboards expose no boot report char even in boot mode.
-    // Subscribe to every notifiable characteristic and let onNotify filter.
-    if (subs == 0)
-        for (auto *ch : hid->getCharacteristics(true))
-            if (ch->canNotify() && ch->subscribe(true, onNotify))
-                subs++;
+            BLE_STEP("subscribed %s", ch->getUUID().toString().c_str());
+        }
+    }
 
     if (subs == 0)
     {
@@ -284,7 +367,8 @@ static void connectToKeyboard()
     g_connected = true;
     memset(g_prevKeys, 0, sizeof(g_prevKeys));
     status()["ble"]["connected"] = true;
-    _log("[blehost] connected, %d report(s)\n", subs);
+    BLE_STEP("connected, %d report(s)", subs);
+    g_connecting = false;
     setStatus("Connected");
 }
 
@@ -313,6 +397,8 @@ void blehost_connect_index(int index)
 void blehost_forget()
 {
     JsonDocument &app = status();
+    if (!g_remembered.isNull())
+        NimBLEDevice::deleteBond(g_remembered); // the pairing key, not just our note of it
     g_remembered = NimBLEAddress();
     app["config"].remove("ble_addr");
     app["config"].remove("ble_type");
@@ -379,6 +465,42 @@ void blehost_loop()
     {
         g_wantConnect = false;
         connectToKeyboard();
+        return;
+    }
+
+    // The connect's remaining steps, each released by a NimBLE callback.
+    if (g_wantSecure)
+    {
+        g_wantSecure = false;
+        if (g_client)
+        {
+            _log("[blehost] secureConnection(async), bonds %d\n", NimBLEDevice::getNumBonds());
+            g_client->secureConnection(true);
+        }
+        return;
+    }
+    if (g_wantSetup)
+    {
+        g_wantSetup = false;
+        finishSetup();
+        return;
+    }
+
+    // Deadline. Pairing has no timeout of its own that we can rely on - a
+    // keyboard that stops answering mid-bond left the old blocking version
+    // parked indefinitely - so the loop, which is now free to run, enforces one.
+    // The stored key is the prime suspect, so drop it: only then can the next
+    // attempt pair from scratch.
+    if (g_connecting && millis() - g_connectStart > CONNECT_LIMIT_MS)
+    {
+        g_connecting = false;
+        _log("[blehost] pairing timed out after %lums; dropping bond for %s\n",
+             CONNECT_LIMIT_MS, g_target.toString().c_str());
+        NimBLEDevice::deleteBond(g_target);
+        if (g_client)
+            g_client->disconnect();
+        g_client = nullptr;
+        setStatus("Pairing failed - re-pair the keyboard");
         return;
     }
     if (g_scanDone)
