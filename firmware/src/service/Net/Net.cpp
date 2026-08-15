@@ -85,14 +85,39 @@ static bool tryJoin(JsonDocument &app, const String &ssid, const String &passwor
 // fails: it hands out a DHCP lease and then drops outbound 443. Without this the
 // firmware could only report "TLS failed", which reads as a bug in the firmware
 // rather than a network that won't carry the traffic.
+// Why the last probe failed, so the screen can say which half of "no internet"
+// broke - a name that won't resolve is a different problem from a port that
+// won't open, and on a phone hotspot it is usually the first.
+static const char *g_probeFail = "no internet";
+
 static bool probeReachable(const char *host)
 {
-    WiFiClient probe;
-    probe.setTimeout(NET_PROBE_MS / 1000);
-    bool ok = probe.connect(host, 443, NET_PROBE_MS);
-    probe.stop();
-    _log("[net] reachability probe %s:443 -> %s\n", host, ok ? "ok" : "FAILED");
-    return ok;
+    // Twice: a hotspot's resolver is often still coming up a second after the
+    // lease lands, and one DNS timeout then looks exactly like a blocked port.
+    for (int attempt = 0; attempt < 2; attempt++)
+    {
+        if (attempt)
+            delay(1000);
+
+        IPAddress ip;
+        if (!WiFi.hostByName(host, ip))
+        {
+            g_probeFail = "no DNS";
+            _log("[net] probe %s -> DNS failed (try %d)\n", host, attempt + 1);
+            continue;
+        }
+
+        WiFiClient probe;
+        probe.setTimeout(NET_PROBE_MS / 1000);
+        bool ok = probe.connect(ip, 443, NET_PROBE_MS);
+        probe.stop();
+        _log("[net] probe %s (%s):443 -> %s (try %d)\n", host, ip.toString().c_str(),
+             ok ? "ok" : "unreachable", attempt + 1);
+        if (ok)
+            return true;
+        g_probeFail = "no internet";
+    }
+    return false;
 }
 
 NetStatus net_connect(JsonDocument &app, const char *probeHost, NetProgress progress)
@@ -250,7 +275,7 @@ NetStatus net_connect(JsonDocument &app, const char *probeHost, NetProgress prog
     // ---- 4. is it actually carrying traffic? --------------------------------
     if (probeHost && *probeHost && !probeReachable(probeHost))
     {
-        g_error = String("Joined ") + won + " but no internet";
+        g_error = String("Joined ") + won + " but " + g_probeFail;
         return NET_NO_INTERNET;
     }
 
