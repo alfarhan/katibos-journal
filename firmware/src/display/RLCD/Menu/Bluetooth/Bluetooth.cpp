@@ -11,6 +11,48 @@
 
 static int g_cursor = 0;
 
+// One list, saved keyboards first: they are the ones you actually switch
+// between, and a scan hit you have already paired should not appear twice.
+// Rows are built the same way for render and for the key handler, so the cursor
+// can never mean a different row in each.
+struct BtRow
+{
+    String name;
+    String addr;
+    int type;
+    bool saved;
+};
+
+static int btRows(BtRow *out, int max)
+{
+    JsonDocument &app = status();
+    int n = 0;
+
+    if (app["ble"]["saved"].is<JsonArray>())
+        for (JsonVariant v : app["ble"]["saved"].as<JsonArray>())
+        {
+            if (n >= max)
+                break;
+            out[n++] = {v["name"].as<String>(), v["addr"].as<String>(), v["type"] | 0, true};
+        }
+
+    if (app["ble"]["devices"].is<JsonArray>())
+        for (JsonVariant v : app["ble"]["devices"].as<JsonArray>())
+        {
+            if (n >= max)
+                break;
+            String addr = v["addr"].as<String>();
+            bool known = false;
+            for (int i = 0; i < n; i++)
+                if (out[i].saved && out[i].addr == addr)
+                    known = true;
+            if (known)
+                continue;
+            out[n++] = {v["name"].as<String>(), addr, v["type"] | 0, false};
+        }
+    return n;
+}
+
 void Bluetooth_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
     g_cursor = 0;
@@ -38,17 +80,14 @@ void Bluetooth_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         u8->print(st);
     }
 
-    // found-devices list
-    if (!app["ble"]["devices"].is<JsonArray>())
-        app["ble"]["devices"].to<JsonArray>();
-    JsonArray devs = app["ble"]["devices"].as<JsonArray>();
-    int count = (int)devs.size();
+    BtRow list[16];
+    int count = btRows(list, 16);
     int cursor = paginate::clampInt(g_cursor, 0, count > 0 ? count - 1 : 0);
     int page = paginate::pageOf(cursor, BT_PER_PAGE);
     int rows = paginate::rowsOnPage(page, BT_PER_PAGE, count);
 
     u8->setCursor(10, 74);
-    u8->print("FOUND KEYBOARDS:");
+    u8->print("KEYBOARDS:");
     RLCD_drawScrollbar(display, 384, 84, 266, page * BT_PER_PAGE, BT_PER_PAGE, count);
 
     if (count == 0)
@@ -70,11 +109,22 @@ void Bluetooth_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             u8->setBackgroundColor(ST7305_COLOR_BLACK);
         }
 
-        const char *nm = devs[idx]["name"].as<const char *>();
-        if (!nm || !*nm)
+        String nm = list[idx].name;
+        if (nm.isEmpty() || nm == "null")
             nm = "(unknown)";
         u8->setCursor(14, y);
-        u8->printf("[%d]  %s", idx + 1, nm);
+        u8->printf("[%d]  %s", idx + 1, nm.c_str());
+
+        // A saved keyboard is marked; the connected one says so in words, since
+        // "paired" and "in use right now" are different things to know.
+        const char *peer = app["ble"]["peer"] | "";
+        bool live = (app["ble"]["connected"] | false) && list[idx].name == peer;
+        if (live || list[idx].saved)
+        {
+            const char *tag = live ? "in use" : "saved";
+            u8->setCursor(374 - u8->getUTF8Width(tag), y);
+            u8->print(tag);
+        }
 
         if (focused)
         {
@@ -96,8 +146,8 @@ void Bluetooth_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 void Bluetooth_keyboard(int key)
 {
     JsonDocument &app = status();
-    JsonArray devs = app["ble"]["devices"].as<JsonArray>();
-    int count = (int)devs.size();
+    BtRow list[16];
+    int count = btRows(list, 16);
 
     if (key == 20) // Up
     {
@@ -113,8 +163,11 @@ void Bluetooth_keyboard(int key)
     }
     if (key == '\n' || key == '\r')
     {
-        if (count > 0)
-            blehost_connect_index(g_cursor);
+        if (count > 0 && g_cursor < count)
+        {
+            const BtRow &r = list[g_cursor];
+            blehost_connect_addr(r.addr.c_str(), r.type, r.name.c_str());
+        }
         Menu_clear();
         return;
     }
@@ -126,7 +179,8 @@ void Bluetooth_keyboard(int key)
     }
     if (key == 'F' || key == 'f')
     {
-        blehost_forget();
+        if (count > 0 && g_cursor < count && list[g_cursor].saved)
+            blehost_forget_addr(list[g_cursor].addr.c_str(), list[g_cursor].type);
         Menu_clear();
         return;
     }
