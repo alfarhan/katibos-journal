@@ -56,7 +56,17 @@ void WifiEntry_keyboard(char key)
             // forget: drop the entry and persist
             JsonArray savedAccessPoints = app["wifi"]["access_points"].as<JsonArray>();
             if ((int)savedAccessPoints.size() > wifi_config_index)
+            {
+                // a pin on the network being forgotten would outlive it, and
+                // net_connect would then skip a network it can never join
+                if (app["config"]["wifi_pref"].as<String>() ==
+                    savedAccessPoints[wifi_config_index]["ssid"].as<String>())
+                {
+                    app["config"]["wifi_pref"] = "";
+                    config_save();
+                }
                 savedAccessPoints.remove(wifi_config_index);
+            }
             wifi_config_save();
             wifi_config_status = WIFI_CONFIG_LIST;
             app["wifi_config_status"] = wifi_config_status;
@@ -207,6 +217,23 @@ void WifiEntry_keyboard(char key)
             app["wifi_cursor"] = 0;
             wifi_config_status = WIFI_CONFIG_SCAN;
             app["wifi_config_status"] = wifi_config_status;
+            return;
+        }
+
+        // D: pin the focused network as the one tried first, or unpin it if it
+        // already is. A pin is a standing choice, so it outranks wifi_last -
+        // which is only whatever happened to work most recently.
+        if ((key == 'D' || key == 'd') && count > 0)
+        {
+            String ssid = aps[cursor]["ssid"].as<String>();
+            if (!ssid.isEmpty() && ssid != "null")
+            {
+                if (app["config"]["wifi_pref"].as<String>() == ssid)
+                    app["config"]["wifi_pref"] = "";
+                else
+                    app["config"]["wifi_pref"] = ssid;
+                config_save();
+            }
             return;
         }
 

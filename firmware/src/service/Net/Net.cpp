@@ -161,22 +161,26 @@ NetStatus net_connect(JsonDocument &app, const char *probeHost, NetProgress prog
             tried[nTried++] = s;
     };
 
-    // ---- 1. the one that worked last time, with no scan at all --------------
-    // This is the common case - same desk, same router - and skipping the scan
-    // takes several seconds off every sync and every proofread.
-    String last = app["config"]["wifi_last"].as<String>();
-    if (!last.isEmpty() && last != "null")
-    {
+    // ---- 1. the preferred network, then the one that worked last, no scan ----
+    // Both skip the scan, which takes several seconds off every sync and every
+    // proofread. The pin (Wi-Fi screen, D) comes first because it is a standing
+    // instruction; wifi_last is only ever a guess from history, and the two
+    // disagree exactly when the guess was a network you don't want.
+    auto tryDirect = [&](const String &ssid) {
+        if (joined || ssid.isEmpty() || ssid == "null" || alreadyTried(ssid))
+            return;
         bool stillSaved = false;
         for (JsonVariant ap : saved)
-            if (ap["ssid"].as<String>() == last)
+            if (ap["ssid"].as<String>() == ssid)
                 stillSaved = true;
-        if (stillSaved) // it may have been forgotten on the Wi-Fi screen since
-        {
-            markTried(last);
-            joined = tryJoin(app, last, savedPassword(app, last), progress);
-        }
-    }
+        if (!stillSaved)
+            return; // forgotten on the Wi-Fi screen since it was recorded
+        markTried(ssid);
+        joined = tryJoin(app, ssid, savedPassword(app, ssid), progress);
+    };
+
+    tryDirect(app["config"]["wifi_pref"].as<String>());
+    tryDirect(app["config"]["wifi_last"].as<String>());
 
     // ---- 2. saved networks in range, strongest first ------------------------
     if (!joined && millis() - began < NET_TOTAL_MS)

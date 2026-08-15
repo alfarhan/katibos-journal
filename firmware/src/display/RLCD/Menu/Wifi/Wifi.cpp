@@ -14,7 +14,7 @@
 // hints centered under it, the same footer Sync and Update use. These screens are
 // the only place the network keys exist, so they have to say what they are.
 #define WIFI_HINTS(a) (a), (int)(sizeof(a) / sizeof((a)[0]))
-static const RLCD_Hint LIST_HINTS[] = {{"ENT", "OPEN"}, {"N", "ADD"}, {"S", "SCAN"}, {"ESC", "BACK"}};
+static const RLCD_Hint LIST_HINTS[] = {{"ENT", "OPEN"}, {"N", "ADD"}, {"S", "SCAN"}, {"D", "DEFAULT"}, {"ESC", "BACK"}};
 static const RLCD_Hint SCAN_HINTS[] = {{"ENT", "JOIN"}, {"R", "RESCAN"}, {"ESC", "BACK"}};
 static const RLCD_Hint ENTRY_HINTS[] = {{"ENT", "EDIT"}, {"F", "FORGET"}, {"ESC", "BACK"}};
 static const RLCD_Hint EDIT_HINTS[] = {{"ENT", "NEXT"}, {"ESC", "CANCEL"}};
@@ -145,6 +145,15 @@ void Wifi_render_list(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             ssid = "(empty)";
         u8->setCursor(14, y);
         u8->printf("[%d]  %s", idx + 1, ssid);
+
+        // the pinned network wears a checkmark, the same mark the sync provider
+        // list uses for "this is the one in force"
+        if (app["config"]["wifi_pref"].as<String>() == ssid)
+        {
+            uint16_t ink = focused ? ST7305_COLOR_WHITE : ST7305_COLOR_BLACK;
+            display->drawLine(356, y - 4, 360, y, ink);
+            display->drawLine(360, y, 366, y - 9, ink);
+        }
 
         if (focused)
         {
