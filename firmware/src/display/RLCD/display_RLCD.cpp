@@ -230,7 +230,32 @@ static int rlcd_wordcount()
            app["config"][format("wordcount_buffer_%d", i)].as<int>();
 }
 
-// The rest screen: the deck mark with كاتب on its screen, beside what you were
+// The device as a mark. The smile is plotted as a circular arc rather than
+// assembled from line segments - at this size a three-segment "curve" reads as a
+// chevron, not a smile.
+void RLCD_drawDeviceMark(ST7305_4p2_BW_DisplayDriver *display, int x, int y)
+{
+    display->drawRectangle(x, y, x + 84, y + 104, 1);
+    display->drawRectangle(x + 1, y + 1, x + 83, y + 103, 1);
+    display->drawRectangle(x + 13, y + 13, x + 71, y + 61, 1);
+
+    display->drawFilledRectangle(x + 29, y + 26, x + 34, y + 32, 1); // eyes
+    display->drawFilledRectangle(x + 50, y + 26, x + 55, y + 32, 1);
+
+    const int cx = x + 42, cy = y + 26, r = 18;
+    for (int dx = -14; dx <= 14; dx++)
+    {
+        int dy = (int)(sqrtf((float)(r * r - dx * dx)) + 0.5f);
+        display->writePoint(cx + dx, cy + dy, true); // 2px: the 1px arc is faint
+        display->writePoint(cx + dx, cy + dy - 1, true);
+    }
+
+    // keyboard deck below the screen
+    display->drawFilledRectangle(x + 20, y + 72, x + 64, y + 77, 1);
+    display->drawFilledRectangle(x + 12, y + 86, x + 72, y + 92, 1);
+}
+
+// The rest screen: the deck mark beside what you were
 // writing and how far you got. One design for both states - the mark says which
 // machine this is, the numbers say where you left off - with only the closing
 // line differing, since a nap needs a key and a shut down needs the same key but
@@ -245,12 +270,7 @@ static void rlcd_draw_rest(bool asleep)
 
     // ---- the deck, drawn as a mark ----
     const int mx = 44, my = 84;
-    display.drawRectangle(mx, my, mx + 84, my + 104, 1);
-    display.drawRectangle(mx + 1, my + 1, mx + 83, my + 103, 1);
-    display.drawRectangle(mx + 13, my + 13, mx + 71, my + 61, 1);
-    RLCD_drawShapedLabel(&u8g2, mx + 22, my + 40, "كاتب", true);
-    display.drawFilledRectangle(mx + 20, my + 72, mx + 64, my + 77, 1);
-    display.drawFilledRectangle(mx + 12, my + 86, mx + 72, my + 92, 1);
+    RLCD_drawDeviceMark(&display, mx, my);
 
     // ---- what you were writing ----
     const int tx = 156;

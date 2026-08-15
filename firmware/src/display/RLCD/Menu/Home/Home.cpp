@@ -190,7 +190,7 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         return;
     }
 
-    RLCD_drawTitleBar(display, u8, 0, 0, 400, 28, "katibOS  \u0643\u0627\u062a\u0628", 0);
+    RLCD_drawTitleBar(display, u8, 0, 0, 400, 28, "katibOS", 0);
     display->drawLine(SPLIT_X, 34, SPLIT_X, 292, 1);
 
     // ---- files, left. No header: the list is the subject of the screen, and the

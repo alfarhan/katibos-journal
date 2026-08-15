@@ -10,26 +10,11 @@ void About_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     display->clearDisplay();
 }
 
-// The device, drawn as a mark: a deck with "كاتب" on its screen. Gives the
-// About screen a face the way the Happy Mac does, in the script the OS is for.
-static void drawDeviceMark(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, int x, int y)
-{
-    display->drawRectangle(x, y, x + 84, y + 104, 1);
-    display->drawRectangle(x + 1, y + 1, x + 83, y + 103, 1);
-    display->drawRectangle(x + 13, y + 13, x + 71, y + 61, 1);
-
-    RLCD_drawShapedLabel(u8, x + 22, y + 40, "كاتب", true);
-
-    // keyboard deck below the screen
-    display->drawFilledRectangle(x + 20, y + 72, x + 64, y + 77, 1);
-    display->drawFilledRectangle(x + 12, y + 86, x + 72, y + 92, 1);
-}
-
 void About_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
     Menu_drawHeader(display, u8, "ABOUT");
 
-    drawDeviceMark(display, u8, 34, 108);
+    RLCD_drawDeviceMark(display, 34, 108);
 
     // name, version, then who made it - one block beside the mark
     u8->setFont(u8g2_font_profont22_mf);

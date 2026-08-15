@@ -21,6 +21,12 @@ int RLCD_drawShapedLabel(U8G2_FOR_ST73XX *u8, int x, int y, const char *utf8, bo
 // Same layout, no drawing - for centering a label before it is drawn.
 int RLCD_shapedLabelWidth(U8G2_FOR_ST73XX *u8, const char *utf8, bool baseHintRTL = false);
 
+// The device as a mark, 84x104 from (x,y): a deck wearing the Happy Mac's face.
+// About and the rest screen both draw it, so it lives here - two copies of the
+// same portrait is how they drift apart.
+class ST7305_4p2_BW_DisplayDriver;
+void RLCD_drawDeviceMark(ST7305_4p2_BW_DisplayDriver *display, int x, int y);
+
 // Action hints: the key in plain text, the verb on an inverted chip next to it
 // ("^S SAVE", "ESC BACK"). The chip is what carries the "this is pressable"
 // signal, so keys need no brackets and the pairs stay readable in a row. Verbs
