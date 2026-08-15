@@ -67,7 +67,7 @@ static const HelpLine MENU_LEFT[] = {
 static const HelpLine MENU_RIGHT[] = {
     HDR("JUMP (from home)"),
     {"P", "Preferences", false},
-    {"L", "Language", false},
+    {"L", "Layout", false},
     {"W", "Wi-Fi", false},
     {"S", "Sync", false},
     {"D", "USB Drive", false},

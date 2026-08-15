@@ -74,7 +74,7 @@ void Layout_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
 void Layout_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
-    Menu_drawHeader(display, u8, "LANGUAGE");
+    Menu_drawHeader(display, u8, "LAYOUT");
 
     int active = currentRow();
     // no footer here - the list fills the screen instead, so the rows get the

@@ -64,7 +64,7 @@ static const char *actionLabel(int act)
     switch (act)
     {
     case ACT_PREFS: return "Preferences";
-    case ACT_LANGUAGE: return "Language";
+    case ACT_LANGUAGE: return "Layout";
     case ACT_WIFI: return "Wi-Fi";
     case ACT_SYNC: return "Sync";
     case ACT_SYNCPROV: return "Provider";
