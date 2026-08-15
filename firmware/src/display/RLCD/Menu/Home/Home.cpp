@@ -73,21 +73,18 @@ static int Home_wordCount(int idx)
            app["config"][format("wordcount_buffer_%d", idx)].as<int>();
 }
 
-// Per-file sync marker, drawn just left of the word count: a checkmark when the
-// file is up to date on Drive, a filled dot when it has edits not yet synced
-// (the unsynced flag - set on save, cleared on a successful sync). `xr` is the
-// marker's right edge; `color` flips to white on the focused (inverse) row.
-static void Home_drawSyncMark(ST7305_4p2_BW_DisplayDriver *display, int xr, int y, bool synced, uint16_t color)
+// Longest prefix of `title` that still fits `avail` px once shaped. Measured,
+// not a fixed character cap: the count column moves with the number's width, and
+// an Arabic glyph is not the same width as a Latin one.
+static String Home_fitTitle(U8G2_FOR_ST73XX *u8, const String &title, int avail)
 {
-    if (synced)
+    for (int n = 24; n > 4; n--)
     {
-        display->drawLine(xr - 9, y - 4, xr - 5, y, color); // checkmark
-        display->drawLine(xr - 5, y, xr, y - 8, color);
+        String t = capUtf8(title, n);
+        if (RLCD_shapedLabelWidth(u8, t.c_str(), false) <= avail)
+            return t;
     }
-    else
-    {
-        display->drawFilledRectangle(xr - 7, y - 7, xr - 2, y - 2, color); // pending dot
-    }
+    return capUtf8(title, 4);
 }
 
 // Classic Mac scroll bar: a stippled track between two arrow boxes, with a plain
@@ -220,16 +217,16 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         u8->printf("[%d] ", idx);
         int tx = u8->getCursorX();
 
-        // The word count goes: at this width it would eat the title, and the sync
-        // mark is the part you actually scan for.
-        bool synced = !app["config"][format("unsynced_%d", idx)].as<bool>();
-        Home_drawSyncMark(display, SBX - 8, y, synced,
-                          focused ? ST7305_COLOR_WHITE : ST7305_COLOR_BLACK);
+        char cnt[16];
+        snprintf(cnt, sizeof(cnt), "%d", Home_wordCount(idx));
+        int cntX = SBX - 12 - u8->getUTF8Width(cnt);
+        u8->setCursor(cntX, y);
+        u8->print(cnt);
 
         String title = app["config"][format("title_%d", idx)].as<String>();
         if (title.isEmpty() || title == "null")
             title = "(empty)";
-        RLCD_drawShapedLabel(u8, tx, y, capUtf8(title, 17).c_str(), false);
+        RLCD_drawShapedLabel(u8, tx, y, Home_fitTitle(u8, title, cntX - 6 - tx).c_str(), false);
 
         if (focused)
         {
@@ -424,6 +421,14 @@ void Home_keyboard(char key)
     {
         app["menu"]["return"] = MENU_HOME;
         app["menu"]["state"] = MENU_UPDATE;
+        return;
+    }
+    // T is a jump like the rest, even though it opens a confirm over this screen
+    // rather than a screen of its own - Home_render/Home_keyboard already hand
+    // the whole screen to that dialog while it is up.
+    if (key == 'T' || key == 't')
+    {
+        Settings_letter(key);
         return;
     }
 
