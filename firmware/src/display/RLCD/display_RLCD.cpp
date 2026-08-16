@@ -338,11 +338,34 @@ static void rlcd_idle_sleep(bool deep)
     rlcd_draw_rest(true);
 }
 
-// There used to be a depolarizing flush here - black/white cycles to drive every
-// pixel both polarities on boot. It was written for a ghost that turned out to be
-// a wrong panel profile (see RLCD_TYPE in platformio.ini), and nothing parks this
-// panel in LPM any more, so it was 600ms of flashing on every boot against a
-// problem that no longer occurs.
+// Depolarizing flush. YDP420H001-V3 is a NORMALLY WHITE reflective TFT, and on
+// those a long-held frame leaves DC bias trapped in the liquid crystal - the whole
+// panel comes back washed out and grey. Rewriting the same white pixel does NOT
+// lift it: the charge only relaxes while the pixel is driven the OTHER way, which
+// is why removing power fixes it and a re-init does not.
+//
+// This was removed earlier today on the theory that the ghost it was written for
+// was really a wrong panel profile. That was half right - the profile WAS wrong -
+// but taking the flush out is what brought back the grey screen after every soft
+// restart. Two attempts to explain that through the LPM/HPM init sequence both
+// failed; a soft restart never interrupts the panel's supply, so trapped bias
+// survives it, and an esptool reset is a soft restart too. Put it back.
+static const int FLUSH_CYCLES = 2;
+static const int FLUSH_HOLD_MS = 150;
+
+static void rlcd_flush_retention()
+{
+  for (int i = 0; i < FLUSH_CYCLES; i++)
+  {
+    display.drawFilledRectangle(0, 0, 399, 299, ST7305_COLOR_BLACK);
+    display.display();
+    delay(FLUSH_HOLD_MS);
+
+    display.clearDisplay();
+    display.display();
+    delay(FLUSH_HOLD_MS);
+  }
+}
 
 void display_RLCD_setup()
 {
@@ -350,6 +373,8 @@ void display_RLCD_setup()
 
   // The display driver owns SPI setup and the complete supplier startup sequence.
   display.initialize();
+
+  rlcd_flush_retention();
 
   // connect u8g2 procedures to TFT_eSPI
   u8g2.begin(display);
