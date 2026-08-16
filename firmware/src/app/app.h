@@ -15,7 +15,7 @@
 // still carries a dead URL, so a stale SD-card config can't break update
 // checks. Set in platformio.ini; this is the fallback if an env omits it.
 #ifndef KATIBOS_UPDATE_URL
-#define KATIBOS_UPDATE_URL "https://raw.githubusercontent.com/alfarhan/katibos/main/firmware/latest.json"
+#define KATIBOS_UPDATE_URL "https://raw.githubusercontent.com/alfarhan/katibos-journal/main/firmware/latest.json"
 #endif
 
 // default utility headers

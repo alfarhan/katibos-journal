@@ -55,7 +55,7 @@ device's SD-card updater also expects). The device reads a manifest to find newe
 Device `config.json` points at the raw manifest:
 
 ```json
-"update": { "url": "https://raw.githubusercontent.com/alfarhan/katibos/main/firmware/latest.json" }
+"update": { "url": "https://raw.githubusercontent.com/alfarhan/katibos-journal/main/firmware/latest.json" }
 ```
 
 First install must be over USB/SD (OTA can't bootstrap itself); after that, updates are over the air.
