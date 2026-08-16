@@ -21,19 +21,19 @@ void FactoryReset_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *
 {
     // Same dialog shape as Delete file / Rename: a window on an empty field,
     // with the keys it answers to directly beneath it.
-    const int wx = 24, wy = 46, ww = 352, wh = 176;
+    const int wx = 16, wy = 46, ww = 368, wh = 176;
     RLCD_drawWindow(display, u8, wx, wy, ww, wh, "FACTORY RESET");
 
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     u8->setCursor(wx + 16, wy + 54);
-    u8->print("Erase ALL notes and reset settings?");
+    u8->print("Erase all notes & settings?");
     u8->setCursor(wx + 16, wy + 80);
-    u8->print("Wi-Fi & sync stay configured.");
+    u8->print("Wi-Fi & sync are kept.");
 
     u8->setCursor(wx + 16, wy + 118);
-    u8->print("This cannot be undone on the device.");
+    u8->print("This cannot be undone.");
     u8->setCursor(wx + 16, wy + 140);
-    u8->print("Sync first to keep a safe copy.");
+    u8->print("Sync first to keep a copy.");
 
     if (g_armed)
     {
@@ -41,7 +41,7 @@ void FactoryReset_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *
         u8->setForegroundColor(ST7305_COLOR_WHITE);
         u8->setBackgroundColor(ST7305_COLOR_BLACK);
         u8->setCursor(wx + 16, wy + 167);
-        u8->print("Press Y again to ERASE EVERYTHING");
+        u8->print("Press Y again to ERASE");
         u8->setForegroundColor(ST7305_COLOR_BLACK);
         u8->setBackgroundColor(ST7305_COLOR_WHITE);
     }

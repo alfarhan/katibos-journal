@@ -122,8 +122,24 @@ public:
     // long uninterrupted burst (or a hang) can otherwise be lost; the snapshot
     // bounds that loss. Its mere presence at boot means the last session never
     // saved cleanly (crash / power loss), so the window is offered back.
-    static const unsigned long RECOVERY_INTERVAL = 3000;
+    // Every 30s, not every 3s: the write costs 360-590ms of frozen screen
+    // (measured on this FAT/flash), and autosave already flushes the real file
+    // 2s after any pause - so this only has to bound how much a CRASH could
+    // cost during typing that never pauses. 30s of unbroken typing is the
+    // exposure; paying half a second of freeze ten times as often to shrink it
+    // was a far worse trade than it looked.
+    static const unsigned long RECOVERY_INTERVAL = 30000;
+    // ...but never in the middle of a burst of typing. The snapshot is a FAT
+    // write, and a flash write on the ESP32 disables the cache and halts BOTH
+    // cores for as long as it takes (measured in the hundreds of ms on a full
+    // buffer) - the screen freezes and the queued keystrokes all land at once.
+    // So it also waits for a short lull, exactly like autosave does. A typist
+    // who never pauses would otherwise never get a snapshot, hence the ceiling:
+    // after RECOVERY_MAX_DEFER the write happens regardless.
+    static const unsigned long RECOVERY_QUIET_MS = 600;
+    static const unsigned long RECOVERY_MAX_DEFER = 45000;
     unsigned long lastRecoverySnapshot = 0;
+    unsigned long lastEditMs = 0;
     String recoveryPath() { return fileName + ".recovery"; }
     void maybeWriteRecovery(); // time-gated snapshot, called from loop()
     void writeRecovery();      // dump window + buffer now

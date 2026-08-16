@@ -19,7 +19,56 @@
 
 // Arabic glyphs are drawn from a font that carries the connected presentation
 // forms; Latin/ASCII keeps the existing ProFont. The Arabic face + size are
-#define WP_FONT_ARABIC u8g2_font_10x20_t_arabic
+// Selectable editor face. Each entry pairs a LATIN and an ARABIC font, because
+// the two are drawn on the same line - enlarging only the Latin one leaves the
+// Arabic looking thin beside it, which is the complaint this exists to answer.
+//
+// `scale` is integer pixel doubling (U8G2_FOR_ST73XX::setScale). It is the only
+// way to get heavier strokes out of these fonts: 10x20_t_arabic is already the
+// largest Arabic face u8g2 ships here (unifont_t_arabic measured SMALLER and
+// lighter), so at scale 1 there is nothing bolder to switch to. Doubling a
+// smaller face instead turns every 1px stem into 2px - solid rather than hairline
+// on a reflective panel that has no contrast to spare.
+struct EditorFont
+{
+    const char *name;
+    const uint8_t *latin;
+    uint8_t latinScale;
+    const uint8_t *arabic;
+    uint8_t arabicScale;
+    int width; // Latin advance, corrected by measurement at setup
+    int pitch; // baseline-to-baseline at Normal line spacing
+};
+
+static EditorFont WP_FONTS[] = {
+    {"Normal", u8g2_font_profont22_mf, 1, u8g2_font_10x20_t_arabic, 1, 12, 22},
+    {"Large", u8g2_font_profont29_mf, 1, u8g2_font_10x20_t_arabic, 1, 16, 29},
+    {"Bold", u8g2_font_profont15_mf, 2, u8g2_font_cu12_t_arabic, 2, 18, 30},
+};
+static const int WP_FONT_COUNT = (int)(sizeof(WP_FONTS) / sizeof(WP_FONTS[0]));
+static EditorFont *wp_font = &WP_FONTS[0];
+
+int WP_fontCount() { return WP_FONT_COUNT; }
+const char *WP_fontName(int i)
+{
+    return (i >= 0 && i < WP_FONT_COUNT) ? WP_FONTS[i].name : "";
+}
+
+// setFont() resets the scale, so the two always travel together - never call
+// setFont directly for editor text.
+static void WP_selectFont(U8G2_FOR_ST73XX *u8, bool arabic)
+{
+    if (arabic)
+    {
+        u8->setFont(wp_font->arabic);
+        u8->setScale(wp_font->arabicScale);
+    }
+    else
+    {
+        u8->setFont(wp_font->latin);
+        u8->setScale(wp_font->latinScale);
+    }
+}
 
 //
 int STATUSBAR_Y = 295;
@@ -76,30 +125,40 @@ static bool needsDisplay = true;
 bool WP_contentChanged();
 
 //
-const int font_width = 12;
-const int font_height = 22;
+int font_width = 12;
+int font_height = 22;
 // Bottom anchor of the text region. Mutable: when the status bar is hidden the
 // anchor drops to reclaim the bar's band for an extra line (applyStatusbarLayout).
 int cursorY = 270;
 const int cursorHeight = 2;
 const int marginX = 5;
+// The right inset is its own value, not a mirror of marginX. This is an
+// Arabic-first editor: RTL lines start at the right edge, so that is the margin
+// the writer actually looks at, and it wants more air than the ragged left.
+const int marginRight = 10;
 //
 int editY = cursorY - 6;
 
-#define WP_FONT u8g2_font_profont22_mf
 
-// Line spacing: the baseline-to-baseline pitch. Glyphs stay font_height (22)
-// tall; the pitch only changes the gap. Compact/Tight go BELOW font_height to
-// fit more lines - fine for unvocalized Arabic, but harakat/tashkīl can touch.
+// Line spacing: the baseline-to-baseline pitch. The glyphs are font_height tall
+// whatever the setting; the pitch only changes the gap between them.
+// Offsets from the face's own height, not absolute pixel counts. At the 22px
+// Normal font these reproduce the original 20/22/26/30 exactly, but they now
+// follow a larger face instead of clipping it - an absolute 20px "Compact"
+// against a 29px glyph is not tight leading, it is overlapping lines.
 static int linePitchFor(int spacing)
 {
+    int pitch;
     switch (spacing)
     {
-    case 1: return 26;           // Relaxed
-    case 2: return 30;           // Spacious
-    case 3: return 20;           // Compact
-    default: return font_height; // Normal (22)
+    case 1: pitch = font_height + 4; break; // Relaxed
+    case 2: pitch = font_height + 8; break; // Spacious
+    case 3: pitch = font_height - 2; break; // Compact - deliberately under the
+                                            // glyph height: fine for unvocalized
+                                            // Arabic, but harakat can touch
+    default: pitch = font_height; break;    // Normal
     }
+    return pitch < 8 ? 8 : pitch;
 }
 
 // Apply line spacing to the editor's row count — the single source of truth for
@@ -113,18 +172,63 @@ static void applyLineSpacing(int spacing)
 // Hidden status bar -> reclaim its band for one more text line. Drops the bottom
 // anchor (cursorY/editY) and recomputes rows. The bottom-mode caret-bar offset is
 // (cursorY - editY), so keeping that delta at 6 keeps the bar hugging its line
-// wherever the anchor lands. Shown = the legacy 270/264 (pixel-identical). Hidden
-// editY=292: the bottom line sits flush to the edge (~1px) and the leftover slack
-// stays at the top (~13px); still 13 lines (292/22).
+// wherever the anchor lands. Shown = the legacy 270/264 (pixel-identical).
+//
+// Hidden used to put the last baseline at 292, ~1px off the panel edge, with all
+// the leftover slack (editY is rarely an exact multiple of the pitch) sitting
+// unused at the TOP. Spending that slack at the bottom instead lifts the text off
+// the edge for free - the row count is computed before the lift, so this never
+// costs the line that hiding the bar just bought. Capped so a large pitch, which
+// can leave a lot of slack, doesn't push the block conspicuously high.
+static const int HIDDEN_BOTTOM_LIFT_MAX = 8;
+
 static void applyStatusbarLayout()
 {
+    int spacing = status()["config"]["line_spacing"] | 0;
+
     cursorY = statusbar_hidden ? 298 : 270;
     editY = cursorY - 6;
-    applyLineSpacing(status()["config"]["line_spacing"] | 0);
+    applyLineSpacing(spacing);
+
+    if (statusbar_hidden)
+    {
+        int pitch = linePitchFor(spacing);
+        int slack = editY - Editor::getInstance().rows * pitch;
+        if (slack > HIDDEN_BOTTOM_LIFT_MAX)
+            slack = HIDDEN_BOTTOM_LIFT_MAX;
+        if (slack > 0)
+        {
+            editY -= slack;
+            cursorY -= slack;
+        }
+    }
 }
 
 // u8g2 handle the editor's wrap-width callback can use to measure glyphs.
 static U8G2_FOR_ST73XX *wp_u8 = nullptr;
+
+// Glyph advance caches. File scope, not function statics, because they are only
+// valid for the face they were measured with - WP_applyFont() clears them.
+static int wp_latinW = 0;
+static int8_t wp_arabicW[256];
+
+// How far below the baseline the deepest descender reaches, for the ACTIVE face.
+// The caret line's clear band and the selection highlight both extend by this;
+// it used to be a hardcoded 6, which was right for profont22 + 10x20 and far too
+// tight once a face is pixel-doubled - the uncleared tails of the previous frame
+// stay on screen as marks under the last line.
+static int wp_descent = 6;
+
+// Shaped-run advance cache for WP_measure_char_at (one word at a time).
+static const char *cw_buf = nullptr;
+static int cw_ws = -1, cw_we = -1;
+static int cw_w[96];
+
+void WP_invalidateWidthCache()
+{
+    cw_buf = nullptr;
+    cw_ws = cw_we = -1;
+}
 static int WP_cell_width(U8G2_FOR_ST73XX *u8, const bidi::Cell &cell);
 
 // Pixel advance of one logical code point in isolation. Used as the fallback
@@ -140,15 +244,14 @@ static int WP_measure_char(uint16_t cp)
     // ASCII/Latin: ProFont is monospace, so one cached value covers it.
     if (cp < 0x0600)
     {
-        static int latinW = 0;
-        if (latinW == 0)
+        if (wp_latinW == 0)
         {
-            wp_u8->setFont(WP_FONT);
-            latinW = wp_u8->getUTF8Width("n");
-            if (latinW <= 0)
-                latinW = font_width;
+            WP_selectFont(wp_u8, false);
+            wp_latinW = wp_u8->getUTF8Width("n");
+            if (wp_latinW <= 0)
+                wp_latinW = font_width;
         }
-        return latinW;
+        return wp_latinW;
     }
 
     // Arabic base block: isolated-form width per code point. NOTE this differs
@@ -156,31 +259,23 @@ static int WP_measure_char(uint16_t cp)
     // the contextual measurement for wrapping; this stays only as a fallback.
     if (cp >= 0x0600 && cp <= 0x06FF)
     {
-        static int8_t cache[256];
-        static bool init = false;
-        if (!init)
-        {
-            for (int k = 0; k < 256; k++)
-                cache[k] = -1;
-            init = true;
-        }
         int idx = cp - 0x0600;
-        if (cache[idx] < 0)
+        if (wp_arabicW[idx] < 0)
         {
-            wp_u8->setFont(WP_FONT_ARABIC);
+            WP_selectFont(wp_u8, true);
             char b[4];
             int len = bidi::utf8Encode(cp, b);
             b[len] = 0;
             int w = wp_u8->getUTF8Width(b);
             if (w < 0) w = 0;
             if (w > 30) w = 30;
-            cache[idx] = (int8_t)w;
+            wp_arabicW[idx] = (int8_t)w;
         }
-        return cache[idx];
+        return wp_arabicW[idx];
     }
 
     // anything else (presentation forms, symbols): measure directly
-    wp_u8->setFont(WP_FONT_ARABIC);
+    WP_selectFont(wp_u8, true);
     char b[4];
     int len = bidi::utf8Encode(cp, b);
     b[len] = 0;
@@ -209,9 +304,6 @@ static int WP_measure_char_at(const char *buf, int i, int len)
     if (!bidi::isArabic(cp))
         return WP_measure_char(cp);
 
-    static const char *cw_buf = nullptr;
-    static int cw_ws = -1, cw_we = -1;
-    static int cw_w[96];
     if (!(buf == cw_buf && i >= cw_ws && i < cw_we))
     {
         int ws = i;
@@ -238,6 +330,53 @@ static int WP_measure_char_at(const char *buf, int i, int len)
     return cw_w[i - cw_ws];
 }
 
+// Switch the editor face. Everything downstream of the metrics has to be redone:
+// the advance caches were measured with the old font, the wrap width is in
+// pixels, and rows-per-screen falls out of the pitch. Safe to call at any time -
+// Preferences calls it when the setting changes.
+void WP_applyFont(int index)
+{
+    if (index < 0 || index >= WP_FONT_COUNT)
+        index = 0;
+    wp_font = &WP_FONTS[index];
+
+    wp_latinW = 0;
+    for (int k = 0; k < 256; k++)
+        wp_arabicW[k] = -1;
+    WP_invalidateWidthCache();
+
+    font_height = wp_font->pitch;
+    font_width = wp_font->width;
+    if (wp_u8)
+    {
+        WP_selectFont(wp_u8, false);
+        int w = wp_u8->getUTF8Width("n");
+        if (w > 0)
+            font_width = w; // trust the measurement over the table
+    }
+
+    // Descent comes from the font metrics rather than a constant, and from
+    // whichever of the two faces reaches deeper - Arabic tails are the ones that
+    // overrun. getFontDescent() reports the unscaled value, so it is scaled here.
+    if (wp_u8)
+    {
+        WP_selectFont(wp_u8, false);
+        int dl = (int)wp_u8->getFontMaxDescent() * wp_font->latinScale;
+        WP_selectFont(wp_u8, true);
+        int da = (int)wp_u8->getFontMaxDescent() * wp_font->arabicScale;
+        int d = dl > da ? dl : da;
+        if (d < 6)
+            d = 6; // never tighter than the value the layout was built around
+        if (d > 24)
+            d = 24;
+        wp_descent = d;
+    }
+
+    Editor::getInstance().wrapWidthPx = screen_width - marginX - marginRight - font_width;
+    applyStatusbarLayout(); // recomputes rows from the new pitch
+    Editor::getInstance().pageChanged = true;
+}
+
 //
 void WP_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
@@ -245,7 +384,7 @@ void WP_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     wp_u8 = u8;
     Editor::getInstance().measureCharWidth = WP_measure_char;
     Editor::getInstance().measureCharWidthAt = WP_measure_char_at;
-    Editor::getInstance().wrapWidthPx = screen_width - 2 * marginX - font_width;
+    Editor::getInstance().wrapWidthPx = screen_width - marginX - marginRight - font_width;
 
     // editor instantiate
     Editor::getInstance().init(34, 12);
@@ -255,6 +394,9 @@ void WP_setup(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
     // restore the status-bar setting (Ctrl+H writes the same config key)
     statusbar_hidden = app["config"]["statusbar_hidden"] | false;
+
+    // pick the face before anything measures a glyph
+    WP_applyFont(app["config"]["font"] | 0);
 
     // restore the line spacing + status-bar layout (sets rows-per-screen and the
     // bottom anchor; when the bar boots hidden the text reclaims its band)
@@ -422,6 +564,21 @@ void WP_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         }
     }
 
+    // Nothing that reaches the glass has changed since the last tick, so the
+    // four draw calls below would rebuild a byte-identical frame. Skip them.
+    // They are NOT cheap - BiDi shaping, per-glyph measurement and a full-page
+    // blit come to ~60ms together - and re-running that at the tick rate to
+    // reproduce the same picture is most of what made typing feel sluggish.
+    // WP_contentChanged() already folds in clear_background and the 500ms caret
+    // blink, and must be called exactly once per tick (it updates its own
+    // previous-value state).
+    needsDisplay = WP_contentChanged();
+    if (!needsDisplay)
+    {
+        Editor::getInstance().loop();
+        return;
+    }
+
     // CLEAR BACKGROUND
     WP_render_clear(display, u8);
 
@@ -433,9 +590,6 @@ void WP_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
     // BLINK CURSOR
     WP_render_cursor(display, u8);
-
-    // decide whether the panel actually needs to be pushed over SPI this tick
-    needsDisplay = WP_contentChanged();
 
     //
     if (clear_background)
@@ -638,7 +792,7 @@ static int WP_layout(int line_num, bidi::Cell *cells, int maxCells, bool *rtl)
 // forms actually touch); Latin's ProFont is monospace so this is constant.
 static int WP_cell_width(U8G2_FOR_ST73XX *u8, const bidi::Cell &cell)
 {
-    u8->setFont(cell.arabic ? WP_FONT_ARABIC : WP_FONT);
+    WP_selectFont(u8, cell.arabic);
     char b[4];
     int len = bidi::utf8Encode(cell.glyph, b);
     b[len] = 0;
@@ -651,11 +805,11 @@ static int WP_align_x(int align, bool rtl, int total)
 {
     int x;
     if (align == ALIGN_RIGHT)
-        x = (screen_width - marginX) - total;
+        x = (screen_width - marginRight) - total;
     else if (align == ALIGN_LEFT)
         x = marginX;
     else // AUTO (and the non-justify fallback for JUSTIFY)
-        x = rtl ? ((screen_width - marginX) - total) : marginX;
+        x = rtl ? ((screen_width - marginRight) - total) : marginX;
     if (x < marginX)
         x = marginX;
     return x;
@@ -692,7 +846,7 @@ void WP_render_line(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, i
         for (int c = 1; c < n - 1; c++)
             if (!cells[c].arabic && cells[c].glyph == ' ')
                 gaps++;
-        int extra = (screen_width - 2 * marginX) - total;
+        int extra = (screen_width - marginX - marginRight) - total;
         if (gaps > 0 && extra > 0)
         {
             extraBase = extra / gaps;
@@ -715,7 +869,7 @@ void WP_render_line(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, i
     int lineStartAbs = (int)(ed.linePositions[line_num] - ed.linePositions[0]);
     // vertical band of the highlight, matching the edit-line band clear
     int hiTop = y - font_height + 4;
-    int hiBot = y + 6;
+    int hiBot = y + wp_descent;
 
     for (int c = 0; c < n; c++)
     {
@@ -738,13 +892,13 @@ void WP_render_line(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, i
             u8->setBackgroundColor(ST7305_COLOR_BLACK);
         }
 
-        u8->setFont(cells[c].arabic ? WP_FONT_ARABIC : WP_FONT);
+        WP_selectFont(u8, cells[c].arabic);
         u8->drawGlyph(x, y, cells[c].glyph);
 
         // overlay combining harakat centered over the base, no advance
         for (int m = 0; m < cells[c].nmarks; m++)
         {
-            u8->setFont(WP_FONT_ARABIC);
+            WP_selectFont(u8, true);
             char b[4];
             int bl = bidi::utf8Encode(cells[c].marks[m], b);
             b[bl] = 0;
@@ -768,7 +922,7 @@ void WP_render_line(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, i
     }
 
     // restore the Latin font + colors for any callers that draw after
-    u8->setFont(WP_FONT);
+    WP_selectFont(u8, false);
     u8->setForegroundColor(ST7305_COLOR_BLACK);
     u8->setBackgroundColor(ST7305_COLOR_WHITE);
 }
@@ -779,7 +933,7 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     JsonDocument &app = status();
 
     // SET FONT
-    u8->setFont(WP_FONT);
+    WP_selectFont(u8, false);
 
     // Cursor Information
     int cursorLine = Editor::getInstance().cursorLine;
@@ -822,7 +976,7 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     // Full repaint: draw every visible row except the caret line (drawn last).
     if (clear_background)
     {
-        u8->setFont(WP_FONT);
+        WP_selectFont(u8, false);
         for (int r = 0; r <= lastRow; r++)
         {
             if (r == caretRow)
@@ -839,15 +993,25 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     // The caret line is the edit area, redrawn every tick. When we are NOT doing
     // a full-screen clear, the right-aligned RTL line shifts and reshapes as it
     // grows, so painting over the previous frame leaves ghost glyphs behind.
-    // Clear just this line's band (one glyph-box tall) and repaint it; also
-    // repaint the line above, whose descenders dip into the cleared band.
+    // Clear just this line's band (one glyph-box tall) and repaint it, along with
+    // the neighbours the band overlaps: the line above dips its descenders into
+    // the top of it, and with a deep-descender face (wp_descent is 18 on the
+    // doubled Arabic) the bottom of the band now reaches into the ascenders of
+    // the line below. Repainting only the one above was safe while the caret sat
+    // on the last line - it is not once the caret moves up into the document.
     if (!clear_background)
     {
-        display->drawFilledRectangle(0, caretY - font_height, screen_width, caretY + 6, 0);
+        display->drawFilledRectangle(0, caretY - font_height, screen_width, caretY + wp_descent, 0);
         if (caretRow - 1 >= 0 && cursorLine - 1 >= 0)
         {
             u8->setCursor(marginX, caretY - linePitch);
             WP_render_line(display, u8, cursorLine - 1);
+        }
+        if (caretRow + 1 <= lastRow && cursorLine + 1 < totalLine &&
+            caretY + wp_descent > caretY + linePitch - font_height)
+        {
+            u8->setCursor(marginX, caretY + linePitch);
+            WP_render_line(display, u8, cursorLine + 1);
         }
     }
 

@@ -59,7 +59,7 @@ void Storage_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     const int wx = 44, wy = 30, ww = 312, wh = 240;
     RLCD_drawWindow(display, u8, wx, wy, ww, wh, "STORAGE");
 
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     drawDiskIcon(display, wx + 22, wy + 34);
     u8->setCursor(wx + 62, wy + 56);
     u8->print("Internal disk");

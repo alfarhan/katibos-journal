@@ -33,8 +33,6 @@ static const HelpLine EDIT_LEFT[] = {
     {"^Sh+U", "Sync all", false},
     {"^Space", "Layout", false},
     {"^H", "Status bar", false},
-    {"^,", "Prefs", false},
-    {"^.", "Settings", false},
     {"ESC", "Open menu", false},
 };
 // Movement ordered by how far it takes you - char, word, paragraph, line, page,
@@ -65,7 +63,7 @@ static const HelpLine MENU_LEFT[] = {
     {"T", "Restart", false},
 };
 static const HelpLine MENU_RIGHT[] = {
-    HDR("JUMP (from home)"),
+    HDR("JUMP TO"),
     {"P", "Preferences", false},
     {"L", "Layout", false},
     {"W", "Wi-Fi", false},
@@ -123,6 +121,8 @@ void Help_render_editor(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u
     display->clearDisplay();
     Menu_drawHeader(display, u8, "EDITOR SHORTCUTS");
 
+    // Stays on the smaller face: this overlay lists 14 rows, and at profont22's
+    // 22px glyphs they do not fit the panel at any pitch that keeps them legible.
     u8->setFont(u8g2_font_profont17_tf);
     drawColumn(display, u8, EDIT_LEFT, N(EDIT_LEFT), 8, 194, 12);
     drawColumn(display, u8, EDIT_RIGHT, N(EDIT_RIGHT), 204, 396, 208);
@@ -141,26 +141,25 @@ void Help_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
     Menu_drawHeader(display, u8, "HELP");
 
-    u8->setFont(u8g2_font_profont17_tf);
-    // Pitch is set by the JUMP column, the taller of the two: its last row has to
-    // clear the callout box at y=228. Anything roomier and About lands on top of
-    // the box.
-    const int y0 = 54, pitch = 18;
-    drawColumn(display, u8, MENU_LEFT, N(MENU_LEFT), 8, 194, 12, y0, pitch);
-    drawColumn(display, u8, MENU_RIGHT, N(MENU_RIGHT), 204, 396, 208, y0, pitch);
+    u8->setFont(u8g2_font_profont22_tf);
+    // Pitch is set by the JUMP column, the taller of the two - 9 rows have to fit
+    // between the header and the footer. At profont22 the glyphs are 22 tall, so
+    // the old 18 pitch overlapped them; 24 gives a row of air and still lands the
+    // last row clear of the footer rule.
+    const int y0 = 52, pitch = 24;
+    drawColumn(display, u8, MENU_LEFT, N(MENU_LEFT), 8, 190, 12, y0, pitch);
+    drawColumn(display, u8, MENU_RIGHT, N(MENU_RIGHT), 204, 392, 208, y0, pitch);
 
-    // full-height divider matching the columns (6 rows under the header)
-    display->drawLine(200, 44, 200, y0 + 6 * pitch - 4, 1);
+    // full-height divider matching the columns
+    display->drawLine(200, 42, 200, y0 + (N(MENU_RIGHT) - 1) * pitch + 6, 1);
 
-    // Pointer to the in-editor help, in a callout box so it stands out. The
-    // caret legend rides along inside it - it belongs with the notation it
-    // explains, and this screen has no footer to put it in.
-    const int bx = 8, by = 228, bw = 384, bh = 56;
-    RLCD_drawWindow(display, u8, bx, by, bw, bh, nullptr);
-    u8->setCursor(bx + 14, by + 24);
-    u8->print("Editor shortcuts: press ^/ while writing");
-    u8->setCursor(bx + 14, by + 46);
-    u8->print("^ = Ctrl / Fn");
+    // Pointer to the in-editor help. This used to sit in a callout window, which
+    // the taller rows no longer leave room for - as a footer it costs one line
+    // instead of 56px, and the caret legend still rides along with it.
+    display->drawLine(0, 276, 400, 276, 1);
+    const char *foot = "^/ shortcuts   ^ = Ctrl/Fn";
+    u8->setCursor((400 - u8->getUTF8Width(foot)) / 2, 296);
+    u8->print(foot);
 }
 
 void Help_keyboard(int key)

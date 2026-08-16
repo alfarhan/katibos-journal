@@ -289,6 +289,19 @@ int keyboard_keypad_68_get_key(keypadEvent e)
     if (_fn_pressed && key == 'h')
         return (e.bit.EVENT == KEY_JUST_PRESSED) ? STATUSBAR : 0;
 
+    // Fn + / opens the editor shortcut overlay, Fn + G the AI proofread, Fn + U
+    // syncs the open file. These exist on the HID path (keyboard_HID2Ascii) and
+    // the Help screen lists all three, but the matrix had no chord for them - on
+    // a board whose only keyboard IS the matrix that made them unreachable.
+    // HELP_KEY is handled once in WP_keyboard with no pressed-guard, so it gets a
+    // single edge; the other two are gated on key-down like the clipboard chords.
+    if (_fn_pressed && key == '/')
+        return (e.bit.EVENT == KEY_JUST_PRESSED) ? HELP_KEY : 0;
+    if (_fn_pressed && key == 'g')
+        return (e.bit.EVENT == KEY_JUST_PRESSED) ? AI_PROOFREAD : 0;
+    if (_fn_pressed && key == 'u')
+        return (e.bit.EVENT == KEY_JUST_PRESSED) ? SYNC : 0;
+
     // Fn + A/C/X/V/Z/Y: select-all / copy / cut / paste / undo / redo.
     if (_fn_pressed && (key == 'a' || key == 'c' || key == 'x' || key == 'v' ||
                         key == 'z' || key == 'y'))
@@ -325,6 +338,23 @@ int keyboard_keypad_68_get_key(keypadEvent e)
     // the locale tables instead of returning the hardcoded US character
     JsonDocument &app = status();
     String locale = app["config"]["keyboard_layout"].as<String>();
+
+    // ...but only where the key is meant to be TEXT. Every other screen matches
+    // Latin shortcut letters (S = Sync, W = Wi-Fi, X = delete...), so a non-Latin
+    // layout would turn each of them into a letter no handler can match and the
+    // menu would go dead until the layout was switched back. Forcing US off the
+    // text-entry screens is the same rule keyboard_HID2Ascii already applies; the
+    // matrix path simply never had it. Rename counts as text entry - that is how
+    // an Arabic file title gets typed.
+    {
+        int screen = app["screen"].as<int>();
+        bool textEntry = (screen == WORDPROCESSOR) ||
+                         (screen == MENUSCREEN &&
+                          app["menu"]["state"].as<int>() == MENU_RENAME);
+        if (!textEntry)
+            locale = "US";
+    }
+
     if (locale == "INT")
     {
         // International IS the US layout - the layer table already produced the

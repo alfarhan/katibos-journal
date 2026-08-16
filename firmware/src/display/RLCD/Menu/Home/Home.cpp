@@ -22,15 +22,17 @@ static const int HOME_MAX_FILES = 100;
 // fits above the divider rather than the whole panel.
 #define HOME_PER_PAGE Home_listRows()
 
-// Geometry of the combined screen. Cards are 3 across because "Preferences" is
-// 98px and a 4-across card would only be 91 - measured, not guessed.
+// Geometry of the combined screen. The card column is sized from the widest
+// label: "Preferences" is ~132px at profont22 (it was 98 at profont17), plus a
+// 20px mark and its gaps, so the column needs ~176 and the split moves left to
+// pay for it. The file list keeps the rest.
 static const int LIST_TOP = 52;   // first row baseline
 static const int LIST_PITCH = 22;
 // Side by side: file list left, the cards stacked in a column on the right. Nine
 // cards down 254px of height leaves each 28px - exactly the icon - so they sit
 // edge to edge as one panel rather than nine floating windows.
-static const int SPLIT_X = 238;
-static const int CARD_X = 246;
+static const int SPLIT_X = 208;
+static const int CARD_X = 216;
 static const int CARD_W = 400 - CARD_X - 8;
 static const int CARD_TOP_Y = 38;
 
@@ -196,7 +198,7 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     int rows = paginate::rowsOnPage(page, HOME_PER_PAGE, g_count);
     const int SBX = SPLIT_X - 22;
 
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     for (int r = 0; r < rows; r++)
     {
         int idx = g_indices[page * HOME_PER_PAGE + r];

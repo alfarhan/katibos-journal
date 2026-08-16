@@ -28,7 +28,12 @@ U8G2_FOR_ST73XX u8g2;
 // Fonts used for labels (file titles, status bar). Latin glyphs come from the
 // monospace profont17; Arabic from the connected-forms Arabic font - same pair
 // idea as the word processor, so Arabic shapes and joins correctly outside it.
-#define LBL_FONT u8g2_font_profont17_tf
+#define LBL_FONT u8g2_font_profont22_tf
+// Hint bars keep the smaller face. They are chrome - a row of key chips read at
+// a glance, not text you read - and at 12px/char a footer like Wi-Fi's
+// (OPEN/ADD/SCAN/DEFAULT/BACK) is wider than the panel. Keeping them at 17 also
+// leaves the y=276/296 footer geometry every screen shares exactly as it was.
+#define HINT_FONT u8g2_font_profont17_tf
 #define LBL_FONT_ARABIC u8g2_font_10x20_t_arabic
 
 // Shape + lay out a label, drawing it only when `draw` is set. Measuring runs
@@ -94,7 +99,7 @@ int RLCD_shapedLabelWidth(U8G2_FOR_ST73XX *u8, const char *utf8, bool baseHintRT
 
 int RLCD_hintBarWidth(U8G2_FOR_ST73XX *u8, const RLCD_Hint *hints, int n)
 {
-    u8->setFont(LBL_FONT);
+    u8->setFont(HINT_FONT);
     int w = 0;
     for (int i = 0; i < n; i++)
     {
@@ -108,7 +113,7 @@ int RLCD_hintBarWidth(U8G2_FOR_ST73XX *u8, const RLCD_Hint *hints, int n)
 int RLCD_drawHintBar(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8,
                      int x, int y, const RLCD_Hint *hints, int n)
 {
-    u8->setFont(LBL_FONT);
+    u8->setFont(HINT_FONT);
     for (int i = 0; i < n; i++)
     {
         if (hints[i].key && *hints[i].key)
@@ -277,7 +282,7 @@ static void rlcd_draw_rest(bool asleep)
     title.trim();
     if (title.isEmpty() || title == "null")
         title = "Untitled";
-    u8g2.setFont(u8g2_font_profont17_tf);
+    u8g2.setFont(u8g2_font_profont22_tf);
     RLCD_drawShapedLabel(&u8g2, tx, my + 34, capUtf8(title, 20).c_str(), false);
 
     u8g2.setFont(u8g2_font_profont22_mf);
@@ -285,7 +290,7 @@ static void rlcd_draw_rest(bool asleep)
     u8g2.setCursor(tx, my + 70);
     u8g2.print(count.c_str());
 
-    u8g2.setFont(u8g2_font_profont17_tf);
+    u8g2.setFont(u8g2_font_profont22_tf);
 
     // ---- the way back ----
     const char *hint = asleep ? "Press any key" : "Any key to carry on";

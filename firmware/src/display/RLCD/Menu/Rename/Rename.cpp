@@ -57,7 +57,7 @@ void Rename_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     RLCD_drawWindow(display, u8, 12, 44, 376, 176, "RENAME FILE");
 
     const int xl = 32;
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
 
     // field label
     u8->setCursor(xl, 96);
@@ -68,12 +68,12 @@ void Rename_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     display->drawRectangle(bx, by, bx + bw, by + bh, 1);
     int caretX = RLCD_drawShapedLabel(u8, bx + 10, by + 22,
                                       fieldTail(u8, buffer_get(), bw - 20 - CARET_W).c_str(), false);
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     u8->drawGlyph(bx + 10 + caretX, by + 22, '_');
 
     // secondary hint
     u8->setCursor(xl, 172);
-    u8->print("Leave blank to auto-name from line 1.");
+    u8->print("Blank = name from line 1.");
 
     // current title, for reference
     String current = app["config"][format("title_%d", fi)].as<String>();
@@ -84,7 +84,7 @@ void Rename_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         RLCD_drawShapedLabel(u8, u8->getCursorX(), 202, capUtf8(current, 22).c_str(), false);
     }
 
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     static const RLCD_Hint HINTS[] = {{"ENT", "SAVE"}, {"ESC", "CANCEL"}};
     RLCD_drawHintBar(display, u8, 12, 252, RLCD_HINTS(HINTS));
 }

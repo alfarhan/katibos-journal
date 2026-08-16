@@ -36,3 +36,8 @@ void WP_keyboard(int key, bool pressed, int index = -1);
 //
 String formatNumberWithCommas(long num);
 
+// Editor face selection (config "font" -> index into the WP_FONTS table).
+int WP_fontCount();
+const char *WP_fontName(int index);
+void WP_applyFont(int index);
+void WP_invalidateWidthCache();

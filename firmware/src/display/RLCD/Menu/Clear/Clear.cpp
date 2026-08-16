@@ -21,36 +21,38 @@ void Clear_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     int fi = app["config"]["file_index"].as<int>();
     String title = app["config"][format("title_%d", fi)].as<String>();
 
-    RLCD_drawWindow(display, u8, 30, 56, 340, 164, "DELETE FILE");
+    // Window widened and the copy tightened for profont22: at 12px/char the old
+    // 340px box clipped both note lines mid-word.
+    RLCD_drawWindow(display, u8, 16, 56, 368, 164, "DELETE FILE");
 
-    u8->setFont(u8g2_font_profont17_tf);
-    u8->setCursor(50, 110);
+    u8->setFont(u8g2_font_profont22_tf);
+    u8->setCursor(32, 110);
     u8->print("Delete this file?");
 
     // The target file, emphasised in an inverse bar (same look as the list
     // highlight) so it's unmistakable which file is about to go. Number first
     // (LTR), then the name (shaped, so Arabic renders).
-    display->drawFilledRectangle(46, 124, 354, 146, 1);
+    display->drawFilledRectangle(32, 124, 368, 146, 1);
     u8->setForegroundColor(ST7305_COLOR_WHITE);
     u8->setBackgroundColor(ST7305_COLOR_BLACK);
-    u8->setCursor(56, 141);
+    u8->setCursor(42, 141);
     u8->printf("[%d]  ", fi);
     if (title.isEmpty() || title == "null")
         u8->print("(empty)");
     else
-        RLCD_drawShapedLabel(u8, u8->getCursorX(), 141, capUtf8(title, 22).c_str(), false);
+        RLCD_drawShapedLabel(u8, u8->getCursorX(), 141, capUtf8(title, 18).c_str(), false);
     u8->setForegroundColor(ST7305_COLOR_BLACK);
     u8->setBackgroundColor(ST7305_COLOR_WHITE);
 
     // plain-language note: deletion isn't reversible on the device
-    u8->setFont(u8g2_font_profont17_tf);
-    u8->setCursor(50, 178);
-    u8->print("This can't be undone on the device.");
-    u8->setCursor(50, 202);
-    u8->print("Sync first to keep a safe copy.");
+    u8->setFont(u8g2_font_profont22_tf);
+    u8->setCursor(32, 178);
+    u8->print("This can't be undone.");
+    u8->setCursor(32, 202);
+    u8->print("Sync first to keep a copy.");
 
     static const RLCD_Hint HINTS[] = {{"Y", "DELETE"}, {"B", "BACK"}};
-    RLCD_drawHintBar(display, u8, 30, 252, RLCD_HINTS(HINTS));
+    RLCD_drawHintBar(display, u8, 16, 252, RLCD_HINTS(HINTS));
 }
 
 //

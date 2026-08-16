@@ -21,7 +21,7 @@ void About_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     u8->setCursor(146, 144);
     u8->print("katibOS");
 
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     u8->setCursor(146, 170);
     u8->print(KATIBOS_VERSION);
     u8->setCursor(146, 200);

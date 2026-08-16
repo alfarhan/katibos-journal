@@ -100,7 +100,7 @@ void Menu_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
     // The title/version moved into Settings; the tab strip (drawn by the FILES
     // and SETTINGS sub-screens) is now the header. Just set the default font.
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
 
     // draw sub module of menu
     int menu_state = app["menu"]["state"].as<int>();

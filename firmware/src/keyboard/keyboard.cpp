@@ -2,9 +2,6 @@
 #include "app/app.h"
 #include "display/display.h"
 
-// marks the menu dirty so it repaints (defined in the RLCD Menu module)
-void Menu_clear();
-#include "display/RLCD/Menu/Home/Home.h" // Home_focusCards - Ctrl+. targets the cards
 
 //
 #include "keyboard/Locale/locale.h"
@@ -343,54 +340,6 @@ void keyboard_HID2Ascii(uint8_t keycode, uint8_t modifier, bool pressed)
   {
     if (pressed)
       display_keyboard(HELP_KEY, false, keycode);
-    return;
-  }
-
-  // Ctrl + , opens Preferences from anywhere (editor or menu). Navigate directly:
-  // from the editor we set a one-shot "goto" that Menu_setup honors (it otherwise
-  // resets to FILES on menu entry); already in the menu we just switch state.
-  if (keycode == 0x36 && ctrl)
-  {
-    if (pressed)
-    {
-      JsonDocument &app = status();
-      if (app["screen"].as<int>() == MENUSCREEN)
-      {
-        app["menu"]["prefs_from_editor"] = false;
-        app["menu"]["state"] = MENU_PREFS;
-        Menu_clear(); // mark dirty so the menu repaints the new screen
-      }
-      else
-      {
-        app["menu"]["prefs_from_editor"] = true;
-        app["menu"]["goto"] = MENU_PREFS;
-        app["screen"] = MENUSCREEN;
-      }
-    }
-    return;
-  }
-
-  // Ctrl + . puts the cursor on the settings CARDS, the same way Ctrl + , opens
-  // Preferences - the two neighbouring keys reach the two setting surfaces. There
-  // is no separate SETTINGS screen any more, so this focuses the lower half of the
-  // combined home rather than switching screens.
-  if (keycode == 0x37 && ctrl)
-  {
-    if (pressed)
-    {
-      JsonDocument &app = status();
-      if (app["screen"].as<int>() == MENUSCREEN)
-      {
-        app["menu"]["state"] = MENU_HOME;
-        Home_focusCards(true); // already in the menu: just cross the divider
-        Menu_clear();          // mark dirty so the menu repaints
-      }
-      else
-      {
-        app["menu"]["goto"] = MENU_SETTINGS;
-        app["screen"] = MENUSCREEN;
-      }
-    }
     return;
   }
 

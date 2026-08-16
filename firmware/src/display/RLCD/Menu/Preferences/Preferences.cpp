@@ -5,6 +5,7 @@
 #include "display/RLCD/display_RLCD.h"
 #include "display/RLCD/Menu/FileList/Pagination.h"
 #include "service/Idle/Idle.h"
+#include "display/RLCD/WordProcessor/WordProcessor.h" // WP_fontCount/WP_fontName/WP_applyFont
 
 // One consolidated Preferences screen: behavior toggles/values grouped by
 // section. Editor/display rows cycle in place (the editor re-reads these config
@@ -15,6 +16,7 @@ enum
 {
     R_HEAD = 0, // non-selectable section header
     R_THEME,
+    R_FONT,
     R_SPACE,
     R_FLOW,
     R_STATUS,
@@ -37,6 +39,7 @@ struct PRow
 static const PRow ROWS[] = {
     {R_HEAD, "EDITOR"},
     {R_THEME, "Theme"},
+    {R_FONT, "Font"},
     {R_SPACE, "Line spacing"},
     {R_FLOW, "Text flow"},
     {R_STATUS, "Status bar"},
@@ -83,6 +86,8 @@ static String valueStr(JsonDocument &app, int type)
     {
     case R_THEME:
         return app["config"]["theme_dark"].as<bool>() ? "Dark" : "Light";
+    case R_FONT:
+        return WP_fontName((app["config"]["font"] | 0) % WP_fontCount());
     case R_SPACE:
         return SPACE_LBL[(app["config"]["line_spacing"] | 0) % 4];
     case R_FLOW:
@@ -129,6 +134,17 @@ static void cycle(JsonDocument &app, int type, int dir)
     case R_THEME:
         app["config"]["theme_dark"] = !app["config"]["theme_dark"].as<bool>();
         break;
+    case R_FONT:
+    {
+        // Applied immediately, not on editor entry like the other rows: the face
+        // decides glyph advances and rows-per-screen, and the caches keyed to the
+        // old font have to go with it.
+        int n = WP_fontCount();
+        int i = (((app["config"]["font"] | 0) + (dir > 0 ? 1 : n - 1)) % n);
+        app["config"]["font"] = i;
+        WP_applyFont(i);
+        break;
+    }
     case R_SPACE:
         app["config"]["line_spacing"] = (((app["config"]["line_spacing"] | 0) + (dir > 0 ? 1 : 3)) % 4);
         break;
@@ -255,7 +271,7 @@ void Preferences_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u
     Menu_drawHeader(display, u8, "PREFERENCES");
 
     const int xl = 24, xr = 384;
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
 
     int y = TOP;
     for (int i = g_top; i < NROWS; i++)

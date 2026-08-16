@@ -752,6 +752,12 @@ void Editor::maybeWriteRecovery()
     unsigned long now = millis();
     if (now - lastRecoverySnapshot < RECOVERY_INTERVAL)
         return;
+
+    // Hold off while the keys are still coming - see RECOVERY_QUIET_MS.
+    if (now - lastEditMs < RECOVERY_QUIET_MS &&
+        now - lastRecoverySnapshot < RECOVERY_MAX_DEFER)
+        return;
+
     lastRecoverySnapshot = now;
     writeRecovery();
 }
@@ -1064,6 +1070,7 @@ void Editor::keyboard(int key, bool pressed)
     bool edit = pressed && isEditKey(key);
     if (edit)
     {
+        lastEditMs = millis();
         memcpy(undoBefore, buffer, getBufferSize() + 1);
         undoCursorBefore = cursorPos;
         undoKind = (key == '\b') ? UNDO_BACK

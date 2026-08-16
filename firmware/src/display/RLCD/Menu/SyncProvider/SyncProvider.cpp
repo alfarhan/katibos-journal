@@ -63,7 +63,7 @@ void SyncProvider_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *
     const int pitch = 19;
     const int xr = 384;
 
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     for (int r = 0; r < PROVIDER_N; r++)
     {
         int y = 48 + r * pitch;
@@ -92,7 +92,7 @@ void SyncProvider_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *
     // GitHub needs a token in config.json (entered over USB Drive Mode); the
     // device only chooses the provider here.
     u8->setCursor(14, 48 + (PROVIDER_N + 1) * pitch);
-    u8->print("GitHub repo/token set in config.json");
+    u8->print("Repo & token: config.json");
 
 
 }

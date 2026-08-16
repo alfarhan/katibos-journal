@@ -23,7 +23,7 @@ static const RLCD_Hint SAVE_HINTS[] = {{"ENT", "SAVE"}, {"ESC", "CANCEL"}};
 static void Wifi_drawHints(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8,
                            const RLCD_Hint *hints, int n)
 {
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     display->drawLine(0, 276, 400, 276, 1);
     RLCD_drawHintBar(display, u8, (400 - RLCD_hintBarWidth(u8, hints, n)) / 2, 296, hints, n);
 }
@@ -71,7 +71,7 @@ void Wifi_render_entry(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8
     if (!ssid || !*ssid)
         ssid = "(empty)";
 
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
 
     // label + the network name in an inverse bar (matches the DELETE FILE look)
     u8->setCursor(10, 62);
@@ -116,7 +116,7 @@ void Wifi_render_list(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     int page = paginate::pageOf(cursor, WIFI_PER_PAGE);
     int rows = paginate::rowsOnPage(page, WIFI_PER_PAGE, count);
 
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     u8->setCursor(10, 46);
     u8->print("SAVED NETWORKS:");
     RLCD_drawScrollbar(display, 384, 56, 266, page * WIFI_PER_PAGE, WIFI_PER_PAGE, count);
@@ -183,7 +183,7 @@ static void Wifi_drawBars(ST7305_4p2_BW_DisplayDriver *display, int x, int y, in
 void Wifi_render_scan(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
     JsonDocument &app = status();
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
 
     // While the scan flag is set, show feedback, push it, then run the (blocking
     // on device) scan, and repaint clean for the results.
@@ -191,7 +191,7 @@ void Wifi_render_scan(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     {
         display->clearDisplay();
         Menu_drawHeader(display, u8, "WI-FI");
-        u8->setFont(u8g2_font_profont17_tf);
+        u8->setFont(u8g2_font_profont22_tf);
         u8->setCursor(10, 80);
         u8->print("Scanning for networks...");
         display->display();
@@ -202,7 +202,7 @@ void Wifi_render_scan(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
         display->clearDisplay();
         Menu_drawHeader(display, u8, "WI-FI");
-        u8->setFont(u8g2_font_profont17_tf);
+        u8->setFont(u8g2_font_profont22_tf);
     }
 
     JsonArray scan = app["network"]["scan"].as<JsonArray>();
@@ -218,7 +218,7 @@ void Wifi_render_scan(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     if (count == 0)
     {
         u8->setCursor(14, 86);
-        u8->print("none found - press R to rescan");
+        u8->print("none found - press R to scan");
     }
 
     for (int r = 0; r < rows; r++)
@@ -260,7 +260,7 @@ void Wifi_render_edit(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     int wifi_config_status = app["wifi_config_status"].as<int>();
     bool ssidStep = (wifi_config_status == WIFI_CONFIG_EDIT_SSID);
 
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     u8->setCursor(10, 62);
     u8->printf("NETWORK [%d] - %s", wifi_config_index + 1,
                ssidStep ? "NAME" : "PASSWORD");

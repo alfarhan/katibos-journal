@@ -282,7 +282,7 @@ void Settings_drawCard(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8
         u8->setForegroundColor(ST7305_COLOR_WHITE);
         u8->setBackgroundColor(ST7305_COLOR_BLACK);
     }
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     const char *label = actionLabel(id);
 
     const int CAP = 12, GAP = 8;
@@ -334,13 +334,13 @@ bool Settings_confirmActive() { return restart_confirm; }
 
 void Settings_drawConfirm(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
-    const int bx = 40, by = 96, bw = 320, bh = 104;
+    const int bx = 16, by = 96, bw = 368, bh = 104;
     RLCD_drawWindow(display, u8, bx, by, bw, bh, "RESTART");
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     u8->setCursor(bx + 16, by + 50);
     u8->print("Restart the device?");
     u8->setCursor(bx + 16, by + 74);
-    u8->print("Any open file is saved first.");
+    u8->print("Open file is saved first.");
     static const RLCD_Hint HINTS[] = {{"Y", "RESTART"}, {"ANY", "CANCEL"}};
     RLCD_drawHintBar(display, u8, bx + (bw - RLCD_hintBarWidth(u8, RLCD_HINTS(HINTS))) / 2,
                      by + bh + 30, RLCD_HINTS(HINTS));
