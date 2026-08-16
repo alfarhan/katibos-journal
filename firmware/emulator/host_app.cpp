@@ -5,9 +5,6 @@
 #include "app/app.h"
 #include "display/display.h"
 #include "host_fs.h"
-#ifdef BATTERY
-#include "service/Battery/Battery.h"
-#endif
 #include <cstdlib>
 #include <cstring>
 
@@ -45,11 +42,6 @@ void app_setup()
     if (!app["config"]["file_index"].is<int>())
         app["config"]["file_index"] = 0;
     app["config"]["wakeup_animation_disabled"] = true; // skip wake animation
-    app["config"]["UsbKeyboard"] = false;              // not the BLE keyboard screen
-
-#ifdef BATTERY
-    battery_setup();
-#endif
 
     // start on the word processor
     app["screen"] = WORDPROCESSOR;
@@ -65,7 +57,7 @@ void ai_loop(); // Ctrl+G proofread, pumped on the same background pass
 
 void app_loop()
 {
-    // Drive the fake sync progression; no battery / dual-core tasks on host.
+    // Drive the fake sync progression; no dual-core tasks on host.
     sync_loop();
     ai_loop();
 }

@@ -80,10 +80,6 @@ inline void pinMode(int, int) {}
 inline void digitalWrite(int, int) {}
 inline int digitalRead(int) { return 0; }
 inline int analogRead(int) { return 0; }
-// battery ADC (Waveshare): 1300 mV at the pin x3 divider = 3.9 V, a mid cell
-#define ADC_11db 3
-inline unsigned int analogReadMilliVolts(int) { return 1300; }
-inline void analogSetPinAttenuation(int, int) {}
 inline void analogWrite(int, int) {}
 inline long random(long max) { return max > 0 ? (rand() % max) : 0; }
 inline long random(long min, long max) { return (max > min) ? (min + rand() % (max - min)) : min; }
@@ -111,7 +107,3 @@ struct _ESPClass
 extern _ESPClass ESP;
 
 #include "HardwareSerial.h"
-
-// keyboard.cpp uses the KEY_* HID constants unconditionally (the on-device
-// build gets them transitively); expose them on the host build too.
-#include "BleKeyboard.h"

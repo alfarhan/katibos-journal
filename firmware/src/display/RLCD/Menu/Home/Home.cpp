@@ -34,12 +34,9 @@ static const int CARD_X = 246;
 static const int CARD_W = 400 - CARD_X - 8;
 static const int CARD_TOP_Y = 38;
 
-// The card block is sized from how many cards this board actually has - a BLE
-// build has nine (Keyboard) and needs a fifth row - and the file list takes
-// whatever is left. Hardcoding either one squashed the icons on one board or
-// wasted a row on the other.
-// Card height falls out of how many this board has; the list simply fills its
-// own column, which is why the split no longer costs it rows.
+// The card block is sized from however many cards are actually listed - Sync
+// comes and goes with the config - and the file list takes whatever is left.
+// Hardcoding the height squashed the icons as soon as a card was added.
 static int Home_cardH()
 {
     int ids[16];
@@ -399,9 +396,6 @@ void Home_keyboard(char key)
     if (key == 'D' || key == 'd') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_STORAGE; return; }
     if (key == 'H' || key == 'h') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_HELP; return; }
     if (key == 'A' || key == 'a') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_ABOUT; return; }
-#ifdef USE_BLE_KEYBOARD_HOST
-    if (key == 'K' || key == 'k') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_BLUETOOTH; return; }
-#endif
     if (key == 'P' || key == 'p')
     {
         app["menu"]["return"] = MENU_HOME;

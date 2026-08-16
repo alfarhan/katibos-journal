@@ -14,9 +14,6 @@ enum
     ACT_WIFI,
     ACT_SYNC,
     ACT_SYNCPROV,
-#ifdef USE_BLE_KEYBOARD_HOST
-    ACT_BTKB,
-#endif
     ACT_DRIVE,
     ACT_UPDATE,
     ACT_HELP,
@@ -24,10 +21,9 @@ enum
     ACT_RESTART
 };
 
-// T ("resTart") asks to restart, behind a confirm: a boot costs a few seconds
-// and, on a BLE build, re-pairing the keyboard. Not R - that is rename on the
-// Files tab, and one letter meaning two things per tab is the collision this key
-// map has been bitten by before.
+// T ("resTart") asks to restart, behind a confirm: a boot costs a few seconds.
+// Not R - that is rename on the Files tab, and one letter meaning two things per
+// tab is the collision this key map has been bitten by before.
 static bool restart_confirm = false;
 
 // Build the visible action list (Sync only appears when a sync URL is set), so
@@ -45,9 +41,6 @@ static int buildList(int *ids)
     if (!app["config"]["sync"]["url"].as<String>().isEmpty() ||
         app["config"]["sync"]["provider"].as<String>() == "git")
         ids[n++] = ACT_SYNC;
-#ifdef USE_BLE_KEYBOARD_HOST
-    ids[n++] = ACT_BTKB;
-#endif
     ids[n++] = ACT_DRIVE;
     ids[n++] = ACT_UPDATE; // always available via built-in fallback URL
     ids[n++] = ACT_HELP;
@@ -68,9 +61,6 @@ static const char *actionLabel(int act)
     case ACT_WIFI: return "Wi-Fi";
     case ACT_SYNC: return "Sync";
     case ACT_SYNCPROV: return "Provider";
-#ifdef USE_BLE_KEYBOARD_HOST
-    case ACT_BTKB: return "Keyboard";
-#endif
     case ACT_DRIVE: return "USB Drive";
     case ACT_UPDATE: return "Update";
     case ACT_HELP: return "Help";
@@ -91,9 +81,6 @@ static char actionKey(int id)
     case ACT_PREFS: return 'P';
     case ACT_WIFI: return 'W';
     case ACT_SYNC: return 'S';
-#ifdef USE_BLE_KEYBOARD_HOST
-    case ACT_BTKB: return 'K';
-#endif
     case ACT_DRIVE: return 'D'; // "USB Drive" - the D of Drive, not the USB
     case ACT_HELP: return 'H';
     case ACT_UPDATE: return 'U';
@@ -188,17 +175,6 @@ static void iconUpdate(ST7305_4p2_BW_DisplayDriver *d, int x, int y, int sz, uin
     d->drawLine(x + S(24), y + S(20), x + S(24), y + S(24), ink);
 }
 
-#ifdef USE_BLE_KEYBOARD_HOST
-static void iconKeyboard(ST7305_4p2_BW_DisplayDriver *d, int x, int y, int sz, uint16_t ink)
-{
-    d->drawRectangle(x + S(1), y + S(6), x + S(27), y + S(22), ink);
-    for (int r = 0; r < 2; r++)
-        for (int c = 0; c < 5; c++)
-            d->drawFilledRectangle(x + S(5 + c * 4), y + S(10 + r * 5),
-                                   x + S(7 + c * 4), y + S(12 + r * 5), ink);
-}
-#endif
-
 static void iconHelp(ST7305_4p2_BW_DisplayDriver *d, int x, int y, int sz, uint16_t ink)
 {
     d->drawLine(x + S(8), y + S(8), x + S(10), y + S(4), ink);
@@ -231,9 +207,6 @@ static void drawActionIcon(ST7305_4p2_BW_DisplayDriver *d, int act, int x, int y
     case ACT_PREFS: iconPrefs(d, x, y, sz, ink); break;
     case ACT_WIFI: iconWifi(d, x, y, sz, ink); break;
     case ACT_SYNC: iconSync(d, x, y, sz, ink); break;
-#ifdef USE_BLE_KEYBOARD_HOST
-    case ACT_BTKB: iconKeyboard(d, x, y, sz, ink); break;
-#endif
     case ACT_DRIVE: iconDrive(d, x, y, sz, ink); break;
     case ACT_UPDATE: iconUpdate(d, x, y, sz, ink); break;
     case ACT_HELP: iconHelp(d, x, y, sz, ink); break;
@@ -261,9 +234,6 @@ static void dispatch(int act)
             app["menu"]["state"] = MENU_SYNC;
         break;
     case ACT_SYNCPROV: app["menu"]["state"] = MENU_SYNCPROV; break;
-#ifdef USE_BLE_KEYBOARD_HOST
-    case ACT_BTKB: app["menu"]["state"] = MENU_BLUETOOTH; break;
-#endif
     case ACT_DRIVE: app["menu"]["state"] = MENU_STORAGE; break;
     case ACT_UPDATE: app["menu"]["state"] = MENU_UPDATE; break;
     case ACT_HELP: app["menu"]["state"] = MENU_HELP; break;

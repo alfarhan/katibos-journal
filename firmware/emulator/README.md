@@ -79,7 +79,7 @@ Clear / Layout(Language) sub-screens, the editor, BiDi + Arabic shaping, all
 keyboard locales, the ST7305 geometry (`ST73XX_UI`) and u8g2 fonts, config
 load/save, the SD-card-backed filesystem (under `sdcard/`).
 
-**Stubbed / not emulated:** WiFi & cloud Sync, BLE keyboard, USB mass-storage
+**Stubbed / not emulated:** WiFi & cloud Sync, USB mass-storage
 "drive mode", OTA firmware update, the physical keypad matrix scan (SDL drives
 input through the real `keyboard_HID2Ascii` pipeline instead). Those menu
 entries show a "not available in emulator" notice.

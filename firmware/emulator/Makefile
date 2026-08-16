@@ -49,10 +49,7 @@ FW_CPP := \
   $(SRC)/display/RLCD/Menu/Preferences/Preferences.cpp \
   $(SRC)/display/RLCD/Menu/FactoryReset/FactoryReset.cpp \
   $(SRC)/service/Updater/Ota.cpp \
-  $(SRC)/display/RLCD/Menu/Bluetooth/Bluetooth.cpp \
-  $(SRC)/keyboard/BLEHost/BLEHost.cpp \
   $(SRC)/service/WifiEntry/WifiEntry.cpp \
-  $(SRC)/service/Battery/Battery.cpp \
   $(SRC)/display/RLCD/ErrorScreen/ErrorScreen.cpp \
   $(SRC)/display/RLCD/Update/Update.cpp \
   $(SRC)/keyboard/keyboard.cpp \

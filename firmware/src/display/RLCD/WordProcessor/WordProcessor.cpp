@@ -12,7 +12,6 @@
 #include "service/Bidi/Bidi.h"
 #include "service/Tools/TextUtil.h"
 #include "service/Sync/Sync.h"
-#include "service/Battery/Battery.h"
 #include "app/Config/Config.h"
 #include "display/RLCD/Menu/Help/Help.h"
 #include "display/RLCD/Menu/Menu.h"
@@ -1044,13 +1043,11 @@ void WP_render_status(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         u8->print(sbUpper(locale).c_str());
     }
 
-    // SAVE STATE + BATTERY - flush to the right edge. SAVED just disappears while
-    // unsaved (no placeholder), so the eye only catches the state it can act on.
-    // Battery is -1 on boards with no sense line, and then omitted.
+    // SAVE STATE - flush to the right edge. SAVED just disappears while unsaved
+    // (no placeholder), so the eye only catches the state it can act on. rev_8
+    // runs its cell through a charger/step-up module with nothing on an ADC, so
+    // there is no battery reading to put beside it.
     String right = Editor::getInstance().saved ? String("SAVED") : String("");
-    int batt = battery_percent();
-    if (batt >= 0)
-        right += (right.isEmpty() ? String("") : String("  ")) + String(batt) + "%";
     if (!right.isEmpty())
     {
         u8->setCursor(SB_EDGE_RIGHT - u8->getUTF8Width(right.c_str()), STATUSBAR_Y);

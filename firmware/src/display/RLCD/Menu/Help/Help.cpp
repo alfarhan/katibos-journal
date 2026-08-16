@@ -71,9 +71,6 @@ static const HelpLine MENU_RIGHT[] = {
     {"W", "Wi-Fi", false},
     {"S", "Sync", false},
     {"D", "USB Drive", false},
-#ifdef USE_BLE_KEYBOARD_HOST
-    {"K", "Keyboard", false},
-#endif
     {"U", "Update", false},
     {"H", "Help", false},
     {"A", "About", false},
@@ -146,8 +143,8 @@ void Help_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
     u8->setFont(u8g2_font_profont17_tf);
     // Pitch is set by the JUMP column, the taller of the two: its last row has to
-    // clear the callout box at y=228 (10 rows on a BLE build). Anything roomier
-    // and About lands on top of the box.
+    // clear the callout box at y=228. Anything roomier and About lands on top of
+    // the box.
     const int y0 = 54, pitch = 18;
     drawColumn(display, u8, MENU_LEFT, N(MENU_LEFT), 8, 194, 12, y0, pitch);
     drawColumn(display, u8, MENU_RIGHT, N(MENU_RIGHT), 204, 396, 208, y0, pitch);
@@ -188,9 +185,6 @@ void Help_keyboard(int key)
     if (key == 'L' || key == 'l') { app["menu"]["state"] = MENU_LAYOUT; return; }
     if (key == 'W' || key == 'w') { app["menu"]["state"] = MENU_WIFI; return; }
     if (key == 'D' || key == 'd') { app["menu"]["state"] = MENU_STORAGE; return; }
-#ifdef USE_BLE_KEYBOARD_HOST
-    if (key == 'K' || key == 'k') { app["menu"]["state"] = MENU_BLUETOOTH; return; }
-#endif
     if ((key == 'S' || key == 's') && !app["config"]["sync"]["url"].as<String>().isEmpty())
     { app["menu"]["state"] = MENU_SYNC; return; }
     if (key == 'U' || key == 'u')

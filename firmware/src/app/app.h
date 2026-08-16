@@ -13,8 +13,7 @@
 
 // Official OTA manifest. Used whenever config["update"]["url"] is missing or
 // still carries a dead URL, so a stale SD-card config can't break update
-// checks. Per-board default is set in platformio.ini (microjournal -> latest.json,
-// waveshare -> latest_waveshare.json); this is the fallback if an env omits it.
+// checks. Set in platformio.ini; this is the fallback if an env omits it.
 #ifndef KATIBOS_UPDATE_URL
 #define KATIBOS_UPDATE_URL "https://raw.githubusercontent.com/alfarhan/katibos/main/firmware/latest.json"
 #endif

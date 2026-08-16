@@ -20,9 +20,8 @@ int keyboard_keypad_68_get_key(keypadEvent e);
 // wake mode every ESP32 variant supports, whereas the natural low-side scan would
 // need ANY_LOW, which is not universal.
 //
-// Only meaningful where the keys are wired to the chip. A BLE keyboard cannot
-// wake a radio that is off, and USB-CDC input does not survive a sleep, so these
-// compile to nothing on those builds.
+// Only meaningful where the keys are wired to the chip, so these compile to
+// nothing on any build without the matrix.
 void keypad_prepare_wake();
 
 // Hand the pins back to the scanner after a light sleep.

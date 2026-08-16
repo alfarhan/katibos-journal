@@ -1,6 +1,6 @@
 // Host stubs for firmware symbols that depend on hardware-only subsystems with
-// no emulator equivalent. The WiFi / Sync / Drive-mode / BLE-keyboard screens
-// are now compiled from the REAL firmware sources (hardware faked beneath them);
+// no emulator equivalent. The WiFi / Sync / Drive-mode screens are now compiled
+// from the REAL firmware sources (hardware faked beneath them);
 // what remains here is genuinely hardware-only: OTA firmware update and the
 // physical keypad matrix scan (SDL drives input through keyboard_HID2Ascii).
 #include <Arduino.h>

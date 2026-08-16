@@ -46,11 +46,10 @@ String ota_update_url()
     JsonDocument &app = status();
     String url = app["config"]["update"]["url"].as<String>();
     // Fall back to the built-in channel when the config has no URL, or still
-    // carries a dead URL: the pre-rename alfarhan/micro-journal, or the deleted
-    // katibos-waveshare repo. KATIBOS_UPDATE_URL is board-specific (set per-env).
+    // carries the dead pre-rename alfarhan/micro-journal one, so a stale
+    // SD-card config can't break update checks.
     if (url.isEmpty() || url == "null" ||
-        url.indexOf("alfarhan/micro-journal") >= 0 ||
-        url.indexOf("katibos-waveshare") >= 0)
+        url.indexOf("alfarhan/micro-journal") >= 0)
         return KATIBOS_UPDATE_URL;
     return url;
 }

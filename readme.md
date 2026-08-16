@@ -19,7 +19,7 @@ and trimmed to the rev_8 OS only.
 
 | | |
 | --- | --- |
-| [`firmware/`](firmware) | The OS — PlatformIO project (ESP32-S3). Build envs: **`microjournal`** and **`waveshare`**. |
+| [`firmware/`](firmware) | The OS — PlatformIO project (ESP32-S3). Build envs: **`microjournal`** (default) and the `_type1`/`_type2` panel variants. |
 | [`firmware/emulator/`](firmware/emulator) | SDL desktop emulator (build & run the OS with no hardware). |
 | [`firmware/tests/`](firmware/tests) | Host unit tests. |
 | [`firmware/doc/KATIBOS.md`](firmware/doc/KATIBOS.md) | Detailed design / feature doc. |
@@ -35,7 +35,7 @@ Hardware (enclosure STLs, build guide) lives upstream:
 cd firmware
 
 # Device (ESP32-S3)
-pio run -e microjournal              # build (MicroJournal; use -e waveshare for the Waveshare board)
+pio run -e microjournal              # build
 pio run -e microjournal -t upload    # flash over USB
 
 # SDL emulator (desktop, no hardware)

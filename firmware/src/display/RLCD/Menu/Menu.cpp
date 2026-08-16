@@ -12,7 +12,6 @@
 #include "Wifi/Wifi.h"
 #include "Storage/Storage.h"
 #include "Rename/Rename.h"
-#include "Bluetooth/Bluetooth.h"
 #include "Settings/Settings.h"
 #include "Help/Help.h"
 #include "About/About.h"
@@ -140,13 +139,6 @@ void Menu_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             Wifi_setup(display, u8);
 
         Wifi_render(display, u8);
-    }
-    else if (menu_state == MENU_BLUETOOTH)
-    {
-        if (menu_state_prev != menu_state)
-            Bluetooth_setup(display, u8);
-
-        Bluetooth_render(display, u8);
     }
     else if (menu_state == MENU_STORAGE)
     {
@@ -278,13 +270,6 @@ void Menu_keyboard(int key)
     else if (menu_state == MENU_WIFI)
     {
         Wifi_keyboard(key);
-        return;
-    }
-
-    // Bluetooth keyboard host
-    else if (menu_state == MENU_BLUETOOTH)
-    {
-        Bluetooth_keyboard(key);
         return;
     }
 

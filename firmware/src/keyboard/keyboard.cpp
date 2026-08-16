@@ -45,17 +45,9 @@ void Menu_clear();
 #include "KeyboardTinyUSB.h"
 #endif
 
-#ifdef USE_BLE_KEYBOARD_HOST
-#include "keyboard/BLEHost/BLEHost.h"
-#endif
-
 //
 void keyboard_setup()
 {
-#ifdef USE_BLE_KEYBOARD_HOST
-  blehost_setup();
-#endif
-
 #if defined(BOARD_PICO)
   // Register the boot-protocol HID interface at boot, not lazily when the
   // on-screen keyboard first shows, so it's present for BIOS/UEFI POST.
@@ -120,10 +112,6 @@ void keyboard_setup()
 //
 void keyboard_loop()
 {
-#ifdef USE_BLE_KEYBOARD_HOST
-  blehost_loop();
-#endif
-
 #ifdef REV7
   USBHost_loop();
 #endif
@@ -225,10 +213,9 @@ void keyboard_HID2Ascii(uint8_t keycode, uint8_t modifier, bool pressed)
   }
 
   //////////////////////////////////////////
-  // Cmd + . (period) = MENU/back. Mac BLE keyboards (e.g. Keys-To-Go 2) have no
-  // Esc key, and their globe/media keys are vendor codes we never receive; Cmd+.
-  // is the Mac-standard "cancel", and both its keycode (0x37) and the GUI
-  // modifier (bit 3 left / bit 7 right) ride the standard boot report.
+  // Cmd + . (period) = MENU/back. Kept for external HID keyboards with no Esc
+  // key: Cmd+. is the Mac-standard "cancel", and both its keycode (0x37) and the
+  // GUI modifier (bit 3 left / bit 7 right) ride the standard boot report.
   if (keycode == 0x37 && (modifier & 0x88))
   {
     display_keyboard(MENU, pressed, 69);

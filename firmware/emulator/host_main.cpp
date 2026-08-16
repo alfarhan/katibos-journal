@@ -13,7 +13,6 @@
 // firmware screen / menu constants (kept in sync with src/display/display.h)
 #define HOST_WORDPROCESSOR 0
 #define HOST_MENUSCREEN 2
-#define HOST_KEYBOARDSCREEN 5
 #define HOST_MENU_HOME 0
 #define HOST_MENU_STORAGE 12
 
@@ -359,19 +358,13 @@ int main(int argc, char **argv)
                     running = false;
                     continue;
                 }
-                // Emulator-side Esc exit for screens whose real handler can't
-                // cleanly exit on host (BLE screen has no exit; Drive mode's
-                // handler runs a restart loop). Force the transition and DON'T
+                // Emulator-side Esc exit for Drive mode, whose real handler
+                // runs a restart loop on host. Force the transition and DON'T
                 // forward the Esc to the firmware. WiFi (B) and Sync (any key
                 // after completion) handle their own exit, so leave them alone.
                 if (k == SDLK_ESCAPE && e.type == SDL_KEYDOWN)
                 {
                     int screen = host_screen();
-                    if (screen == HOST_KEYBOARDSCREEN)
-                    {
-                        host_set_screen(HOST_MENUSCREEN);
-                        continue;
-                    }
                     if (screen == HOST_MENUSCREEN && host_menu_state() == HOST_MENU_STORAGE)
                     {
                         host_set_menu_state(HOST_MENU_HOME);
