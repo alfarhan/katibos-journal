@@ -73,22 +73,37 @@ static void wipe(JsonDocument &app)
             gfs()->remove((p + "_backup.txt").c_str());
             gfs()->remove((p + ".base64").c_str());
         }
-        const char *perSlot[] = {"title_%d", "title_manual_%d", "drive_id_%d",
-                                 "gh_path_%d", "gh_sha_%d", "synced_modified_%d",
-                                 "synced_hash_%d", "synced_title_%d", "synced_day_%d",
-                                 "unsynced_%d"};
+        // Every per-slot key the firmware writes. caret/edited/wordcount used to
+        // be missing here, which left a reset device opening a blank file at a
+        // caret from the document that was just deleted, showing the old word
+        // count beside it. If a new "<name>_%d" key is added anywhere, it belongs
+        // in this list too.
+        const char *perSlot[] = {"title_%d", "title_manual_%d", "caret_%d", "edited_%d",
+                                 "wordcount_file_%d", "wordcount_buffer_%d",
+                                 "drive_id_%d", "gh_path_%d", "gh_sha_%d",
+                                 "synced_modified_%d", "synced_hash_%d",
+                                 "synced_title_%d", "synced_day_%d", "unsynced_%d"};
         for (auto k : perSlot)
             app["config"].remove(format(k, i));
     }
 
-    // writing stats + tombstones
-    const char *named[] = {"streak", "today_words", "session_words", "last_day", "sync_trash"};
+    // tombstones + the edit counter
+    const char *named[] = {"sync_trash", "sync_trash_git", "edit_seq"};
     for (auto k : named)
+        app["config"].remove(k);
+
+    // Keys no build still reads, kept here on purpose: a config.json carried
+    // forward from an older firmware holds them for good otherwise, and this
+    // screen is the only thing that ever prunes the file.
+    const char *legacy[] = {"streak", "today_words", "session_words", "last_day",
+                            "sleep_light_secs", "sleep_deep_secs"};
+    for (auto k : legacy)
         app["config"].remove(k);
 
     // preferences → remove so each falls back to its default
     const char *prefs[] = {"theme_dark", "line_spacing", "scroll_mode", "text_align",
-                           "statusbar_hidden", "font", "arabic_font"};
+                           "statusbar_hidden", "font", "arabic_font",
+                           "idle_secs", "screensaver", "keyboard_layout"};
     for (auto k : prefs)
         app["config"].remove(k);
 

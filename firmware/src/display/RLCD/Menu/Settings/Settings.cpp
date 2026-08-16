@@ -265,8 +265,6 @@ int Settings_cards(int *ids, int max)
     return n;
 }
 
-const char *Settings_cardLabel(int id) { return actionLabel(id); }
-char Settings_cardKey(int id) { return actionKey(id); }
 void Settings_openCard(int id) { dispatch(id); }
 
 // One card, exactly as the Settings grid draws it: framed window, inverted when

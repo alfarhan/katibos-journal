@@ -93,37 +93,3 @@ void SecondaryCore(void *pvParameters)
 }
 #endif
 
-/*----------------------------------------------
-Dual Core: Second Core
-Second core will contain tasks that can get blocked
-and slowed and yet has still less impact.
-Such as background tasks.
-----------------------------------------------*/
-#ifdef BOARD_PICO
-void setup1()
-{
-    // wait until the app is ready
-    while (true)
-    {
-        if (app_ready())
-            break;
-        delay(1);
-    }
-
-    _log("Secondary Core started.\n");
-    delay(1000);
-}
-
-void loop1()
-{
-    // background tasks will be handled
-    app_loop();
-
-    // run display on the second core
-    if (display_core() == 1)
-        display_loop();
-
-    // try to yield to avoid infinite loop
-    yield();
-}
-#endif

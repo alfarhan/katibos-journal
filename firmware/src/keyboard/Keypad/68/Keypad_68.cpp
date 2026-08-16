@@ -87,15 +87,8 @@ char keys[ROWS][COLS] = {
     {54, 55, 56, 57, 58, 59, 60, 61, 62},
     {63, 64, 65, 66, 67, 68, 69, 70, 71}};
 
-#ifdef BOARD_PICO
-byte rowPins[ROWS] = {0, 1, 2, 3, 4, 5, 6, 7};
-byte colPins[COLS] = {13, 14, 15, 16, 17, 18, 19, 20, 21};
-#endif
-
-#ifdef BOARD_ESP32_S3
 byte rowPins[ROWS] = {8, 18, 17, 16, 15, 7, 6, 5};
 byte colPins[COLS] = {1, 2, 42, 41, 40, 39, 45, 48, 47};
-#endif
 
 //
 Adafruit_Keypad customKeypad = Adafruit_Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
@@ -441,50 +434,3 @@ int keyboard_keypad_68_get_key(keypadEvent e)
     // return the corresponding key
     return key;
 }
-
-// ---- sleep wake support -----------------------------------------------------
-#ifdef BOARD_ESP32_S3
-
-void keypad_prepare_wake()
-{
-    // Stop the scanner before repurposing its pins, or it fights this wiring and
-    // (on the way back) races begin() in keypad_resume_scan().
-    if (s_scanTask)
-        vTaskSuspend(s_scanTask);
-
-    // Hold every column HIGH so a closed key can source current into its row.
-    for (int c = 0; c < COLS; c++)
-    {
-        pinMode(colPins[c], OUTPUT);
-        digitalWrite(colPins[c], HIGH);
-    }
-    // Rows read LOW while nothing is pressed, HIGH the moment any key closes.
-    for (int r = 0; r < ROWS; r++)
-        pinMode(rowPins[r], INPUT_PULLDOWN);
-}
-
-void keypad_resume_scan()
-{
-    // Adafruit_Keypad owns the pin directions during a scan; re-running begin()
-    // is the supported way to get them back rather than reproducing its setup.
-    customKeypad.begin();
-
-    if (s_scanTask)
-        vTaskResume(s_scanTask);
-}
-
-unsigned long long keypad_wake_mask()
-{
-    unsigned long long mask = 0;
-    for (int r = 0; r < ROWS; r++)
-        mask |= (1ULL << rowPins[r]);
-    return mask;
-}
-
-#else // no matrix wired to this chip - nothing can wake it by key
-
-void keypad_prepare_wake() {}
-void keypad_resume_scan() {}
-unsigned long long keypad_wake_mask() { return 0; }
-
-#endif

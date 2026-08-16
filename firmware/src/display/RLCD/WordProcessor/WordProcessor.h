@@ -33,8 +33,6 @@ void WP_render_cursor(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 // 
 void WP_keyboard(int key, bool pressed, int index = -1);
 
-//
-String formatNumberWithCommas(long num);
 
 // Editor face selection (config "font" -> index into the WP_FONTS table).
 int WP_fontCount();

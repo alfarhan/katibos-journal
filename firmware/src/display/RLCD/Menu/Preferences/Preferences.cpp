@@ -20,11 +20,10 @@ enum
     R_ARFONT,
     R_SPACE,
     R_FLOW,
+    R_ALIGN,
     R_STATUS,
     R_IDLE,
     R_SAVER,
-    R_SLEEP,
-    R_DEEP,
     R_LAYOUT,
     R_PROV,
     R_FACTORY,
@@ -44,12 +43,11 @@ static const PRow ROWS[] = {
     {R_ARFONT, "Arabic font"},
     {R_SPACE, "Line spacing"},
     {R_FLOW, "Text flow"},
+    {R_ALIGN, "Alignment"},
     {R_STATUS, "Status bar"},
     {R_HEAD, "POWER"},
     {R_IDLE, "Power save"},
     {R_SAVER, "Screensaver"},
-    {R_SLEEP, "Sleep"},
-    {R_DEEP, "Shut down"},
     {R_HEAD, "INPUT"},
     {R_LAYOUT, "Layout"},
     {R_HEAD, "SYNC"},
@@ -64,13 +62,13 @@ static int g_top = 0;    // first visible row (scroll window)
 
 static const char *SPACE_LBL[] = {"Normal", "Relaxed", "Spacious", "Compact"};
 static const char *FLOW_LBL[] = {"Top", "Middle", "Bottom"};
+// Order matches the ALIGN_* enum in WordProcessor.cpp, which is what the key
+// stores. Auto is 0, so a config without the key reads as Auto.
+static const char *ALIGN_LBL[] = {"Auto", "Right", "Left", "Justify"};
 
-// A row can be hidden outright: the sleep rows are meaningless on a board whose
-// keyboard cannot wake it, and showing a dead setting is worse than showing none.
+// A row can be hidden outright: showing a dead setting is worse than none.
 static bool isShown(int i)
 {
-    if (ROWS[i].type == R_SLEEP || ROWS[i].type == R_DEEP)
-        return sleep_supported();
     if (ROWS[i].type == R_SAVER)
         return idle_timeout_sec() > 0; // nothing rests if Power save is Off
     return true;
@@ -96,20 +94,12 @@ static String valueStr(JsonDocument &app, int type)
         return SPACE_LBL[(app["config"]["line_spacing"] | 0) % 4];
     case R_FLOW:
         return FLOW_LBL[(app["config"]["scroll_mode"] | 2) % 3];
+    case R_ALIGN:
+        return ALIGN_LBL[(app["config"]["text_align"] | 0) % 4];
     case R_STATUS:
         return app["config"]["statusbar_hidden"].as<bool>() ? "Hidden" : "Shown";
     case R_SAVER:
         return (app["config"]["screensaver"] | false) ? "On" : "Off";
-    case R_SLEEP:
-    case R_DEEP:
-    {
-        int s = (type == R_SLEEP) ? sleep_light_sec() : sleep_deep_sec();
-        if (s <= 0)
-            return "Off";
-        if (s < 60)
-            return String(s) + "s";
-        return String(s / 60) + " min";
-    }
     case R_IDLE:
     {
         int s = idle_timeout_sec();
@@ -161,6 +151,11 @@ static void cycle(JsonDocument &app, int type, int dir)
     case R_FLOW:
         app["config"]["scroll_mode"] = (((app["config"]["scroll_mode"] | 2) + (dir > 0 ? 1 : 2)) % 3);
         break;
+    case R_ALIGN:
+        // The renderer already supported all four - the key was read every frame
+        // but written by nothing, so Justify was unreachable code until this row.
+        app["config"]["text_align"] = (((app["config"]["text_align"] | 0) + (dir > 0 ? 1 : 3)) % 4);
+        break;
     case R_STATUS:
         app["config"]["statusbar_hidden"] = !app["config"]["statusbar_hidden"].as<bool>();
         break;
@@ -169,26 +164,6 @@ static void cycle(JsonDocument &app, int type, int dir)
         // no burn-in for it to prevent.
         app["config"]["screensaver"] = !(app["config"]["screensaver"] | false);
         break;
-    case R_SLEEP:
-    case R_DEEP:
-    {
-        // Sleep naps (RAM kept, resumes instantly); Shut down saves and powers
-        // off, coming back at the same caret on the next keypress. Longer
-        // ladders than Power save - these interrupt more than a refresh change.
-        static const int LIGHT[] = {0, 120, 300, 600};
-        static const int DEEP[] = {0, 900, 1800, 3600};
-        const int *steps = (type == R_SLEEP) ? LIGHT : DEEP;
-        const char *key = (type == R_SLEEP) ? "sleep_light_secs" : "sleep_deep_secs";
-        int cur = (type == R_SLEEP) ? sleep_light_sec() : sleep_deep_sec();
-        const int n = 4;
-        int at = 0;
-        for (int i = 0; i < n; i++)
-            if (steps[i] == cur)
-                at = i;
-        at = (at + (dir > 0 ? 1 : n - 1)) % n;
-        app["config"][key] = steps[at];
-        break;
-    }
     case R_IDLE:
     {
         // Off, then a short ladder. After this many seconds without a keystroke

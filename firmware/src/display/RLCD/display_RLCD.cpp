@@ -279,15 +279,14 @@ void RLCD_drawDeviceMark(ST7305_4p2_BW_DisplayDriver *display, int x, int y)
     display->drawFilledRectangle(x + 12, y + 86, x + 72, y + 92, 1);
 }
 
-// The rest screen: the deck mark beside what you were
-// writing and how far you got. One design for both states - the mark says which
-// machine this is, the numbers say where you left off - with only the closing
-// line differing, since a nap needs a key and a shut down needs the same key but
-// pays a boot for it.
+// The rest screen: the deck mark beside what you were writing and how far you
+// got - the mark says which machine this is, the numbers say where you left off.
+// It had a second variant while the sleep tiers existed, drawn just before the
+// chip stopped and closing on "Press any key" instead; that went with them.
 //
 // Mark left, text right: the same arrangement the About screen uses, so the two
 // read as the same family.
-static void rlcd_draw_rest(bool asleep)
+static void rlcd_draw_rest()
 {
     JsonDocument &app = status();
     display.clearDisplay();
@@ -315,7 +314,7 @@ static void rlcd_draw_rest(bool asleep)
     u8g2.setFont(u8g2_font_profont22_tf);
 
     // ---- the way back ----
-    const char *hint = asleep ? "Press any key" : "Any key to carry on";
+    const char *hint = "Any key to carry on";
     u8g2.setCursor((400 - u8g2.getUTF8Width(hint)) / 2, 254);
     u8g2.print(hint);
 
@@ -334,7 +333,7 @@ static void rlcd_idle_enter()
     {
         // The card is about to hide the text, so make sure it is on disk first.
         Editor::getInstance().saveFile();
-        rlcd_draw_rest(false);
+        rlcd_draw_rest();
     }
 }
 
@@ -344,16 +343,6 @@ static void rlcd_idle_exit()
     Editor::getInstance().pageChanged = true;
     Menu_clear();
     status()["clear"] = true;
-}
-
-// Drawn while the chip is still awake, immediately before it sleeps; the panel
-// then holds this frame on its own. Shown regardless of the screensaver setting -
-// a device that looks dead is worse than one that says it is asleep.
-static void rlcd_idle_sleep(bool deep)
-{
-    (void)deep;
-    display.High_Power_Mode(); // make sure this frame actually lands
-    rlcd_draw_rest(true);
 }
 
 // Depolarizing flush. YDP420H001-V3 is a NORMALLY WHITE reflective TFT, and on
@@ -400,7 +389,7 @@ void display_RLCD_setup()
   u8g2.setForegroundColor(ST7305_COLOR_BLACK);
   u8g2.setBackgroundColor(ST7305_COLOR_WHITE);
 
-  idle_setup(rlcd_idle_enter, rlcd_idle_exit, rlcd_idle_sleep);
+  idle_setup(rlcd_idle_enter, rlcd_idle_exit);
 }
 
 //
@@ -441,13 +430,6 @@ void display_RLCD_loop()
       else
         // loop
         ErrorScreen_render(&display, &u8g2);
-    }
-
-    // SLEEP
-    else if (screen == SLEEPSCREEN)
-    {
-      // redirect to WORDPROCESSOR
-      app["screen"] = WORDPROCESSOR;
     }
 
     // WORD PROCESSOR

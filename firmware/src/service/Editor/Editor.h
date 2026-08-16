@@ -3,13 +3,7 @@
 //
 #include <Arduino.h>
 
-#ifdef BOARD_PICO
-#define BUFFER_SIZE 2000
-#endif
-
-#ifdef BOARD_ESP32_S3
 #define BUFFER_SIZE 8000
-#endif
 
 //
 class Editor

@@ -13,10 +13,6 @@
 #include "app/FileSystem/FileSystemFAT.h"
 #endif
 
-#ifdef BOARD_PICO
-#include "app/FileSystem/FileSystemRP2040.h"
-#endif
-
 #ifdef USE_MSC
 #include "service/MassStorage/MassStorage.h"
 #endif
@@ -60,11 +56,6 @@ void app_setup()
     M5Cardputer.begin(cfg, true); // enableKeyboard
 #endif
 
-#if defined(REV7)
-    const int RX_PIN = 45;
-    const int TX_PIN = 48;
-    Serial1.begin(115200, SERIAL_8N1, RX_PIN, TX_PIN);
-#endif
     _log("Setting Baud Rate: %d\n", 115200);
     _log("katibOS %s on %s\n", KATIBOS_VERSION, BOARD_NAME);
 
@@ -191,11 +182,6 @@ FileSystem *gfs()
 #endif
 
 #ifdef USE_MSC
-
-// Initialize the file system here
-#ifdef BOARD_PICO
-        fileSystem = new FileSystemRP2040();
-#endif
 
 // Initialize the file system here
 #ifdef BOARD_ESP32_S3

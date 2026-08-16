@@ -107,6 +107,6 @@ void ST7305_4p2_BW_DisplayDriver::display_Inversion(bool) {}
 void ST7305_4p2_BW_DisplayDriver::setInvert(bool) {}
 
 // private helpers (unused on host)
-void ST7305_4p2_BW_DisplayDriver::address() {}
+void ST7305_4p2_BW_DisplayDriver::address(int, int) {}
 void ST7305_4p2_BW_DisplayDriver::Write_Register(uint8_t) {}
 void ST7305_4p2_BW_DisplayDriver::Write_Parameter(uint8_t) {}

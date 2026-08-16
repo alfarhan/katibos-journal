@@ -455,10 +455,6 @@ bool Editor::saveFile()
     //
     savingInProgress = false;
 
-#if defined(DEBUG) && defined(BOARD_PICO)
-    printMemoryUsage();
-#endif
-
     return true;
 }
 

@@ -1,18 +1,28 @@
 #pragma once
 
 // Idle throttle. After a quiet stretch the main loop stops busy-spinning; any
-// key restores it. Nothing sleeps at this stage, so there is no wake-source to
-// arrange and no state to save or reload.
+// key restores it. Nothing sleeps, so there is no wake-source to arrange and no
+// state to save or reload.
+//
+// There were two deeper tiers here once - a light sleep and a deep-sleep "Shut
+// down", both waking on the matrix through esp_sleep_enable_ext1_wakeup(). They
+// were removed after 1.14.6, on their first run on real hardware: the chip slept
+// and no keypress ever brought it back, so the only way out was pulling the
+// cable. That is the worst possible failure for a device you are meant to trust
+// with your writing, and the tier that failed was also the one with the least to
+// give - the panel's low-power mode only ever saved the booster, and the real
+// power saving here is the main loop's delay(30). If they come back, they need a
+// working serial console first: this was debugged blind because Serial does not
+// reach the USB port on this build, and every theory cost a flash and a two
+// minute wait to test.
 //
 // Deliberately does NOT change the CPU frequency. Going below 80MHz on the
 // ESP32-S3 takes the PLL down with it, which kills USB-CDC - and with it the
 // serial console the device is debugged through.
 
-// Register what to do when entering / leaving the idle state, and what to draw
-// just before the chip sleeps (the panel and its drawing live with the driver, so
-// the caller supplies all three). onSleep is passed true for a shut down, false
-// for a nap, so the two can say different things.
-void idle_setup(void (*onEnter)(), void (*onExit)(), void (*onSleep)(bool deep) = nullptr);
+// Register what to do when entering / leaving the idle state (the panel and its
+// drawing live with the driver, so the caller supplies both).
+void idle_setup(void (*onEnter)(), void (*onExit)());
 
 // Any user input. Resets the countdown and leaves idle immediately.
 void idle_touch();
@@ -25,17 +35,3 @@ bool idle_active();
 
 // Configured timeout in seconds; 0 means never throttle.
 int idle_timeout_sec();
-
-// ---- sleep (Tier 2 / Tier 3) -----------------------------------------------
-// Both are OFF by default, and both need the matrix wired to the chip so a
-// keypress can wake it. Where it isn't (the host emulator) these report 0 and
-// nothing ever sleeps.
-//
-//  light  esp_light_sleep_start(). RAM is retained, so it resumes mid-loop with
-//         the document, window and caret exactly as they were.
-//  deep   esp_deep_sleep_start(). RAM is gone and it restarts from setup(), so
-//         the file is saved first; boot reopens it at the stored caret, which the
-//         editor already does on its own (caret_N in config).
-int  sleep_light_sec(); // 0 = never
-int  sleep_deep_sec();  // 0 = never
-bool sleep_supported(); // false when no key can wake this build

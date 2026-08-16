@@ -11,8 +11,6 @@
 // Home draws the same cards in its lower half, so the list, labels, keys, icons
 // and dispatch stay defined here rather than being copied.
 int Settings_cards(int *ids, int max);
-const char *Settings_cardLabel(int id);
-char Settings_cardKey(int id);
 void Settings_drawCard(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8,
                        int id, int x, int y, int w, int h, bool focused);
 void Settings_openCard(int id);

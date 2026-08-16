@@ -1123,7 +1123,6 @@ extern const uint8_t u8g2_font_unifont_t_urdu[] U8G2_FONT_SECTION("u8g2_font_uni
 extern const uint8_t u8g2_font_unifont_t_polish[] U8G2_FONT_SECTION("u8g2_font_unifont_t_polish");
 extern const uint8_t u8g2_font_unifont_t_devanagari[] U8G2_FONT_SECTION("u8g2_font_unifont_t_devanagari");
 extern const uint8_t u8g2_font_unifont_t_arabic[] U8G2_FONT_SECTION("u8g2_font_unifont_t_arabic");
-extern const uint8_t u8g2_font_ibmplex_arabic_s[] U8G2_FONT_SECTION("u8g2_font_ibmplex_arabic_s");
 extern const uint8_t u8g2_font_ibmplex_arabic_m[] U8G2_FONT_SECTION("u8g2_font_ibmplex_arabic_m");
 extern const uint8_t u8g2_font_ibmplex_arabic_l[] U8G2_FONT_SECTION("u8g2_font_ibmplex_arabic_l");
 extern const uint8_t u8g2_font_unifont_t_symbols[] U8G2_FONT_SECTION("u8g2_font_unifont_t_symbols");

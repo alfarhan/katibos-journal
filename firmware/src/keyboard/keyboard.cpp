@@ -10,144 +10,19 @@
 #include "keyboard/Keypad/68/keypad_68.h"
 #endif
 
-#ifdef KEYPAD_48
-#include "keyboard/Keypad/48/keypad_48.h"
-#endif
-
-#ifdef KNOB
-#include "keyboard/Knob/Knob.h"
-#endif
-
-#ifdef REV7
-#include "keyboard/USBHost/USBHost.h"
-#endif
-
-#ifdef REV6
-#include "keyboard/Keypad/48/keypad_48.h"
-#endif
-
-#ifdef CARDPUTER
-#include "keyboard/CardPuter/keypad_CardPuter.h"
-#include "keyboard/USBHost/USBHost.h"
-#include "keyboard/BLE/ble.h"
-#endif
-
-#ifdef REV5
-#include "keyboard/USBHost/USBHost.h"
-#include "keyboard/Button/button.h"
-#include "keyboard/BLE/ble.h"
-#endif
-
-#ifdef BOARD_PICO
-#include "KeyboardTinyUSB.h"
-#endif
-
 //
 void keyboard_setup()
 {
-#if defined(BOARD_PICO)
-  // Register the boot-protocol HID interface at boot, not lazily when the
-  // on-screen keyboard first shows, so it's present for BIOS/UEFI POST.
-  Keyboard.begin();
-
-  // The arduino-pico core connects to the USB bus and the host may
-  // enumerate before setup() gets around to registering the HID
-  // keyboard/MSC interfaces above (display/filesystem init runs first
-  // and isn't instant) -- a host that already enumerated won't pick up
-  // interfaces added afterwards without a fresh attach cycle.
-  if (TinyUSBDevice.mounted())
-  {
-    TinyUSBDevice.detach();
-    delay(10);
-    TinyUSBDevice.attach();
-  }
-#endif
-
-#ifdef REV7
-  // setup USB Host
-  USBHost_setup();
-#endif
-
 #ifdef KEYPAD_68
   keyboard_keypad_68_setup();
-#endif
-
-#if defined(KEYPAD_48) && defined(BOARD_PICO)
-  keyboard_keypad_48_setup();
-#endif
-
-#ifdef KNOB
-  knob_setup();
-#endif
-
-#ifdef REV5
-  // setup USB Host
-  USBHost_setup();
-
-  // setup BLE Keyboard
-  ble_setup("Micro Journal 5");
-
-  // Front Button Setup
-  button_setup();
-#endif
-
-#ifdef REV6
-  keyboard_keypad_48_setup();
-#endif
-
-#ifdef CARDPUTER
-  keypad_cardputer_setup();
-
-  // setup USB Host
-  USBHost_setup();
-
-  // setup BLE Keyboard
-  ble_setup("MJ CARDPUTER");
 #endif
 }
 
 //
 void keyboard_loop()
 {
-#ifdef REV7
-  USBHost_loop();
-#endif
-
-#ifdef REV6
-  keyboard_keypad_48_loop();
-#endif
-
-#ifdef CARDPUTER
-  keypad_cardputer_loop();
-
-  // setup USB Host
-  USBHost_loop();
-
-  // setup BLE Keyboard
-  ble_loop();
-#endif
-
-#ifdef REV5
-  // setup USB Host
-  USBHost_loop();
-
-  // setup BLE Keyboard
-  ble_loop();
-
-  // Front Button Setup
-  button_loop();
-#endif
-
 #ifdef KEYPAD_68
   keyboard_keypad_68_loop();
-#endif
-
-#if defined(KEYPAD_48) && defined(BOARD_PICO)
-  keyboard_keypad_48_loop();
-#endif
-
-#ifdef KNOB
-  knob_loop();
 #endif
 }
 

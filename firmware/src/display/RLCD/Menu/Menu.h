@@ -26,6 +26,4 @@ void Menu_clear();
 // drill-down screens, so every menu screen shares one header style.
 void Menu_drawHeader(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, const char *title);
 
-//
-void Menu_sync(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8);
 

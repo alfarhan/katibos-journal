@@ -9,23 +9,17 @@
 //
 #define ERRORSCREEN 1
 #define MENUSCREEN 2
-#define SLEEPSCREEN 4
 #define UPDATESCREEN 6
 
-// menu id
+// menu id. Sparse on purpose: these are runtime state values, never persisted,
+// and screens that no longer exist left their numbers behind. Reusing a gap is
+// fine; renumbering the live ones buys nothing.
 #define MENU_HOME 0
 #define MENU_SYNC 1
 #define MENU_CLEAR 2
 #define MENU_LAYOUT 3
 #define MENU_WIFI 4
-#define MENU_FIRMWARE 5
-#define MENU_BUTTONS 7
-#define MENU_BACKGROUND 8
-#define MENU_FONTCOLOR 9
 #define MENU_STORAGE 12
-#define MENU_BRIGHTNESS 13
-#define MENU_INFO 14
-#define MENU_LANGUAGE 15
 #define MENU_RENAME 16
 #define MENU_SETTINGS 17
 #define MENU_HELP 18
@@ -35,11 +29,7 @@
 #define MENU_PREFS 24
 #define MENU_FACTORY 26
 
-// MENU button
-#define FN 28
-
 // special key
-#define EMPTY 0x0
 #define MENU 0x6
 
 // keyboard action codes routed to the active screen as a key (not text input)

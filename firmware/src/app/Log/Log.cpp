@@ -2,14 +2,7 @@
 #include "app/app.h"
 #include <Arduino.h>
 
-#ifdef BOARD_ESP32_S3
-// #define COREID xPortGetCoreID()
 #define COREID xPortGetCoreID()
-#endif
-
-#ifdef BOARD_PICO
-#define COREID get_core_num()
-#endif
 
 //
 // APP LOG
@@ -32,10 +25,6 @@ void _log(const char *format, ...)
 
     // Print to Serial
     Serial.printf("[%d][%d] %s", COREID, millis(), message);
-
-#if defined(REV7)
-    Serial1.printf("[%d][%d] %s", COREID, millis(), message);
-#endif
 
 #if defined(DEBUG_FILE)
     // Append to file
