@@ -28,7 +28,7 @@ U8G2_FOR_ST73XX u8g2;
 // Fonts used for labels (file titles, status bar). Latin glyphs come from the
 // monospace profont17; Arabic from the connected-forms Arabic font - same pair
 // idea as the word processor, so Arabic shapes and joins correctly outside it.
-#define LBL_FONT u8g2_font_profont17_tf
+#define LBL_FONT u8g2_font_profont22_tf
 // Hint bars keep the smaller face. They are chrome - a row of key chips read at
 // a glance, not text you read - and at 12px/char a footer like Wi-Fi's
 // (OPEN/ADD/SCAN/DEFAULT/BACK) is wider than the panel. Keeping them at 17 also
@@ -39,6 +39,15 @@ U8G2_FOR_ST73XX u8g2;
 // survives the switch because every Arabic label is measured, not assumed
 // (RLCD_shapedLabelWidth, Home_fitTitle).
 #define LBL_FONT_ARABIC (wp_arabic_is_plex() ? u8g2_font_ibmplex_arabic_m : u8g2_font_10x20_t_arabic)
+
+// Title bars keep the SMALLER face while the body text grows. 1.13.0 raised both
+// together, because a header and a row label both come through LBL_FONT - and the
+// taller header ate vertical budget on every screen for text nobody reads twice.
+// A title is chrome: you glance at it to know where you are. Overridden around
+// the title bar's own draw rather than threaded through every helper, so
+// RLCD_drawShapedLabel keeps its one-argument shape everywhere else.
+#define TITLE_FONT u8g2_font_profont17_tf
+static const uint8_t *g_labelLatin = LBL_FONT;
 
 // Shape + lay out a label, drawing it only when `draw` is set. Measuring runs
 // the identical path, so a centered label is placed with the exact width it
@@ -56,7 +65,7 @@ static int RLCD_shapedLabel(U8G2_FOR_ST73XX *u8, int x, int y, const char *utf8,
     int startX = x;
     for (int c = 0; c < n; c++)
     {
-        u8->setFont(cells[c].arabic ? LBL_FONT_ARABIC : LBL_FONT);
+        u8->setFont(cells[c].arabic ? LBL_FONT_ARABIC : g_labelLatin);
 
         char b[4];
         int bl = bidi::utf8Encode(cells[c].glyph, b);
@@ -80,7 +89,7 @@ static int RLCD_shapedLabel(U8G2_FOR_ST73XX *u8, int x, int y, const char *utf8,
         x += w;
     }
 
-    u8->setFont(LBL_FONT); // restore the default label font for the caller
+    u8->setFont(g_labelLatin); // restore the active label font for the caller
     return x - startX;
 }
 
@@ -152,11 +161,20 @@ int RLCD_drawTitleBar(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8,
     if (!title || !*title)
         return x;
 
+    // Measure AND draw under the title face, then restore - the tab is sized from
+    // the measurement, so the two must use the same font or the clear box and the
+    // glyphs disagree.
+    const uint8_t *prev = g_labelLatin;
+    g_labelLatin = TITLE_FONT;
+
     // shaped, so a title carrying Arabic renders (and measures) correctly
     int tw = RLCD_shapedLabelWidth(u8, title, false);
     int iconX = x + (w - tw - iconW) / 2;
     display->drawFilledRectangle(iconX - 8, y + 2, iconX + iconW + tw + 8, y + h - 2, 0);
     RLCD_drawShapedLabel(u8, iconX + iconW, y + h - 7, title, false);
+
+    g_labelLatin = prev;
+    u8->setFont(g_labelLatin);
     return iconX;
 }
 
@@ -286,7 +304,7 @@ static void rlcd_draw_rest(bool asleep)
     title.trim();
     if (title.isEmpty() || title == "null")
         title = "Untitled";
-    u8g2.setFont(u8g2_font_profont17_tf);
+    u8g2.setFont(u8g2_font_profont22_tf);
     RLCD_drawShapedLabel(&u8g2, tx, my + 34, capUtf8(title, 20).c_str(), false);
 
     u8g2.setFont(u8g2_font_profont22_mf);
@@ -294,7 +312,7 @@ static void rlcd_draw_rest(bool asleep)
     u8g2.setCursor(tx, my + 70);
     u8g2.print(count.c_str());
 
-    u8g2.setFont(u8g2_font_profont17_tf);
+    u8g2.setFont(u8g2_font_profont22_tf);
 
     // ---- the way back ----
     const char *hint = asleep ? "Press any key" : "Any key to carry on";

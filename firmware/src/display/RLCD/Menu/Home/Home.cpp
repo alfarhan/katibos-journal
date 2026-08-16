@@ -23,16 +23,18 @@ static const int HOME_MAX_FILES = 100;
 #define HOME_PER_PAGE Home_listRows()
 
 // Geometry of the combined screen. The card column is sized from the widest
-// label: "Preferences" is ~132px at profont22 (it was 98 at profont17), plus a
-// 20px mark and its gaps, so the column needs ~176 and the split moves left to
-// pay for it. The file list keeps the rest.
+// label, and every pixel it takes comes off the file list. That used to be
+// "Preferences" at ~132px on profont22, needing a 176px column; shortening it to
+// "Prefs" and "USB Drive" to "Drive" leaves "Restart" the longest at ~84px, so
+// and the split moves right, handing the difference back to the titles - which is
+// the half you actually read.
 static const int LIST_TOP = 52;   // first row baseline
 static const int LIST_PITCH = 22;
 // Side by side: file list left, the cards stacked in a column on the right. Nine
 // cards down 254px of height leaves each 28px - exactly the icon - so they sit
 // edge to edge as one panel rather than nine floating windows.
-static const int SPLIT_X = 238;
-static const int CARD_X = 246;
+static const int SPLIT_X = 252;
+static const int CARD_X = 260;
 static const int CARD_W = 400 - CARD_X - 8;
 static const int CARD_TOP_Y = 38;
 
@@ -198,7 +200,7 @@ void Home_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     int rows = paginate::rowsOnPage(page, HOME_PER_PAGE, g_count);
     const int SBX = SPLIT_X - 22;
 
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     for (int r = 0; r < rows; r++)
     {
         int idx = g_indices[page * HOME_PER_PAGE + r];
@@ -398,7 +400,7 @@ void Home_keyboard(char key)
     if (key == 'D' || key == 'd') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_STORAGE; return; }
     if (key == 'H' || key == 'h') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_HELP; return; }
     if (key == 'A' || key == 'a') { app["menu"]["return"] = MENU_HOME; app["menu"]["state"] = MENU_ABOUT; return; }
-    if (key == 'P' || key == 'p')
+    if (key == 'O' || key == 'o')
     {
         app["menu"]["return"] = MENU_HOME;
         app["menu"]["prefs_from_editor"] = false; // Esc lands back on the file list

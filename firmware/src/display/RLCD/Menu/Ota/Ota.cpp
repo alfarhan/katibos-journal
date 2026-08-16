@@ -35,7 +35,7 @@ static void drawScreen(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8
     Menu_drawHeader(display, u8, "SOFTWARE UPDATE");
 
     // status line, centered in the body
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     String msg = app["ota_message"].as<String>();
     if (!msg.isEmpty() && msg != "null")
     {

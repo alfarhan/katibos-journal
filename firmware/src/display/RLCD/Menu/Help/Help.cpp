@@ -65,11 +65,11 @@ static const HelpLine MENU_LEFT[] = {
 };
 static const HelpLine MENU_RIGHT[] = {
     HDR("JUMP TO"),
-    {"P", "Preferences", false},
+    {"O", "Options", false},
     {"L", "Layout", false},
     {"W", "Wi-Fi", false},
     {"S", "Sync", false},
-    {"D", "USB Drive", false},
+    {"D", "Drive", false},
     {"U", "Update", false},
     {"H", "Help", false},
     {"A", "About", false},
@@ -142,12 +142,12 @@ void Help_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
     Menu_drawHeader(display, u8, "HELP");
 
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     // Pitch is set by the JUMP column, the taller of the two - 9 rows have to fit
     // between the header and the footer. At profont22 the glyphs are 22 tall, so
     // the old 18 pitch overlapped them; 24 gives a row of air and still lands the
     // last row clear of the footer rule.
-    const int y0 = 54, pitch = 18;
+    const int y0 = 52, pitch = 24;
     drawColumn(display, u8, MENU_LEFT, N(MENU_LEFT), 8, 190, 12, y0, pitch);
     drawColumn(display, u8, MENU_RIGHT, N(MENU_RIGHT), 204, 392, 208, y0, pitch);
 
@@ -175,7 +175,7 @@ void Help_keyboard(int key)
 
     // The cheat-sheet lists these as "JUMP TO (any menu)", so honour them here
     // too. Keep the originating tab as the return target (don't overwrite it).
-    if (key == 'P' || key == 'p')
+    if (key == 'O' || key == 'o')
     {
         app["menu"]["prefs_from_editor"] = false;
         app["menu"]["state"] = MENU_PREFS;

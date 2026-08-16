@@ -56,12 +56,17 @@ static const char *actionLabel(int act)
 {
     switch (act)
     {
-    case ACT_PREFS: return "Preferences";
+    // "Prefs", not "Preferences": this label alone set the card column's width,
+    // and every pixel it takes comes off the file list next to it. Keeps a P, which
+    // it must - drawKeyedLabel underlines the card's shortcut letter inside its own
+    // name, so a label without a P would have nothing to mark. ("Settings" has no
+    // P at all.) The screen it opens still titles itself PREFERENCES.
+    case ACT_PREFS: return "Options";
     case ACT_LANGUAGE: return "Layout";
     case ACT_WIFI: return "Wi-Fi";
     case ACT_SYNC: return "Sync";
     case ACT_SYNCPROV: return "Provider";
-    case ACT_DRIVE: return "USB Drive";
+    case ACT_DRIVE: return "Drive";
     case ACT_UPDATE: return "Update";
     case ACT_HELP: return "Help";
     case ACT_ABOUT: return "About";
@@ -78,10 +83,10 @@ static char actionKey(int id)
 {
     switch (id)
     {
-    case ACT_PREFS: return 'P';
+    case ACT_PREFS: return 'O'; // "Options" - O, not P: the label carries the key
     case ACT_WIFI: return 'W';
     case ACT_SYNC: return 'S';
-    case ACT_DRIVE: return 'D'; // "USB Drive" - the D of Drive, not the USB
+    case ACT_DRIVE: return 'D'; // "Drive" - was "USB Drive", the D was always Drive's
     case ACT_HELP: return 'H';
     case ACT_UPDATE: return 'U';
     case ACT_ABOUT: return 'A';
@@ -282,7 +287,7 @@ void Settings_drawCard(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8
         u8->setForegroundColor(ST7305_COLOR_WHITE);
         u8->setBackgroundColor(ST7305_COLOR_BLACK);
     }
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     const char *label = actionLabel(id);
 
     const int CAP = 12, GAP = 8;
@@ -334,13 +339,13 @@ bool Settings_confirmActive() { return restart_confirm; }
 
 void Settings_drawConfirm(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
-    const int bx = 40, by = 96, bw = 320, bh = 104;
+    const int bx = 16, by = 96, bw = 368, bh = 104;
     RLCD_drawWindow(display, u8, bx, by, bw, bh, "RESTART");
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     u8->setCursor(bx + 16, by + 50);
     u8->print("Restart the device?");
     u8->setCursor(bx + 16, by + 74);
-    u8->print("Any open file is saved first.");
+    u8->print("Open file is saved first.");
     static const RLCD_Hint HINTS[] = {{"Y", "RESTART"}, {"ANY", "CANCEL"}};
     RLCD_drawHintBar(display, u8, bx + (bw - RLCD_hintBarWidth(u8, RLCD_HINTS(HINTS))) / 2,
                      by + bh + 30, RLCD_HINTS(HINTS));

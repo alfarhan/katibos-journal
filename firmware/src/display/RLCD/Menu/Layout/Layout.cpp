@@ -82,7 +82,7 @@ void Layout_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     const int pitch = 20;
     const int xr = 384;
 
-    u8->setFont(u8g2_font_profont17_tf);
+    u8->setFont(u8g2_font_profont22_tf);
     for (int r = 0; r < LAYOUT_N; r++)
     {
         int y = 48 + r * pitch;
