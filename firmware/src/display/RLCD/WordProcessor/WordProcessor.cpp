@@ -41,14 +41,19 @@ struct EditorFont
     bool bold;  // widen ink 1px (setEmbolden) instead of doubling the glyph
 };
 
+// Arabic is IBM Plex Sans Arabic Bold, sized per profile; Latin keeps ProFont.
+// Pitch needs no adjustment: the faces' paragraph heights are 16/19/22 (_s/_m/_l,
+// read from their u8g2 headers) against pitches of 22/29, so all three clear.
+// Harakat are the tight case - maxH is 31/38/43 for stacked marks, so Compact
+// line spacing (pitch - 2) is where vowelled text would touch first.
 static EditorFont WP_FONTS[] = {
-    {"Normal", u8g2_font_profont22_mf, 1, u8g2_font_10x20_t_arabic, 1, 12, 22, false},
-    {"Large", u8g2_font_profont29_mf, 1, u8g2_font_10x20_t_arabic, 1, 16, 29, false},
+    {"Normal", u8g2_font_profont22_mf, 1, u8g2_font_ibmplex_arabic_m, 1, 12, 22, false},
+    {"Large", u8g2_font_profont29_mf, 1, u8g2_font_ibmplex_arabic_l, 1, 16, 29, false},
     // Bold is Normal's faces with ink widened a pixel, NOT a small face doubled.
     // Both give 2px stems - the reason this panel needs any of it - but doubling
     // cost 2x the glyph, so "Bold" used to mean "Bold and much bigger" and lost
     // you lines and characters per line. Same size as Normal now, just heavier.
-    {"Bold", u8g2_font_profont22_mf, 1, u8g2_font_10x20_t_arabic, 1, 12, 22, true},
+    {"Bold", u8g2_font_profont22_mf, 1, u8g2_font_ibmplex_arabic_m, 1, 12, 22, true},
 };
 static const int WP_FONT_COUNT = (int)(sizeof(WP_FONTS) / sizeof(WP_FONTS[0]));
 static EditorFont *wp_font = &WP_FONTS[0];
