@@ -251,12 +251,17 @@ void ST7305_4p2_BW_DisplayDriver::setInvert(bool enabled)
 
 void ST7305_4p2_BW_DisplayDriver::Initial_ST7305()
 {
+    // A hardware reset should leave the panel in its power-on state, which would
+    // make the previous session's mode irrelevant. That it DIDN'T - a soft restart
+    // came back grey while a cold boot never did - says 10ms low with no settle
+    // after release was not actually resetting a panel that had been running. Hold
+    // it low properly and let it come up before any command goes out.
     digitalWrite(RES_PIN, HIGH);
     delay(10);
     digitalWrite(RES_PIN, LOW);
-    delay(10);
+    delay(50);
     digitalWrite(RES_PIN, HIGH);
-    delay(10);
+    delay(120);
 
     // Supplier 4.2-inch ST7305 initialization sequence.
     Write_Register(0xD6); // NVM Load Control
@@ -444,6 +449,12 @@ void ST7305_4p2_BW_DisplayDriver::Initial_ST7305()
     // washed out until the cable was pulled. Cold boot hid it completely.
     Write_Register(0x39); // LPM - so the HPM in initialize() is a real transition
     Write_Register(0x29); // DISPLAY ON
+    // ...and give it time to actually BE in LPM. initialize() calls
+    // High_Power_Mode() the instant this returns, so without a settle the two mode
+    // writes go out back to back and whether the panel registers a transition at
+    // all is a race. 1.14.1 added the LPM write and won that race on a manual
+    // restart, then lost it after an OTA reboot.
+    delay(50);
 #else
     Write_Register(0x38); // HPM
     Write_Register(0x29); // DISPLAY ON
