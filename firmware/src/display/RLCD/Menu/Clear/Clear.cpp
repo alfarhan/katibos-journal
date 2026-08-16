@@ -25,7 +25,7 @@ void Clear_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     // 340px box clipped both note lines mid-word.
     RLCD_drawWindow(display, u8, 16, 56, 368, 164, "DELETE FILE");
 
-    u8->setFont(u8g2_font_profont22_tf);
+    u8->setFont(u8g2_font_profont17_tf);
     u8->setCursor(32, 110);
     u8->print("Delete this file?");
 
@@ -45,7 +45,7 @@ void Clear_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     u8->setBackgroundColor(ST7305_COLOR_WHITE);
 
     // plain-language note: deletion isn't reversible on the device
-    u8->setFont(u8g2_font_profont22_tf);
+    u8->setFont(u8g2_font_profont17_tf);
     u8->setCursor(32, 178);
     u8->print("This can't be undone.");
     u8->setCursor(32, 202);

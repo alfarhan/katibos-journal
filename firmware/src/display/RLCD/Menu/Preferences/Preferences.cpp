@@ -271,7 +271,7 @@ void Preferences_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u
     Menu_drawHeader(display, u8, "PREFERENCES");
 
     const int xl = 24, xr = 384;
-    u8->setFont(u8g2_font_profont22_tf);
+    u8->setFont(u8g2_font_profont17_tf);
 
     int y = TOP;
     for (int i = g_top; i < NROWS; i++)

@@ -28,7 +28,7 @@ U8G2_FOR_ST73XX u8g2;
 // Fonts used for labels (file titles, status bar). Latin glyphs come from the
 // monospace profont17; Arabic from the connected-forms Arabic font - same pair
 // idea as the word processor, so Arabic shapes and joins correctly outside it.
-#define LBL_FONT u8g2_font_profont22_tf
+#define LBL_FONT u8g2_font_profont17_tf
 // Hint bars keep the smaller face. They are chrome - a row of key chips read at
 // a glance, not text you read - and at 12px/char a footer like Wi-Fi's
 // (OPEN/ADD/SCAN/DEFAULT/BACK) is wider than the panel. Keeping them at 17 also
@@ -282,7 +282,7 @@ static void rlcd_draw_rest(bool asleep)
     title.trim();
     if (title.isEmpty() || title == "null")
         title = "Untitled";
-    u8g2.setFont(u8g2_font_profont22_tf);
+    u8g2.setFont(u8g2_font_profont17_tf);
     RLCD_drawShapedLabel(&u8g2, tx, my + 34, capUtf8(title, 20).c_str(), false);
 
     u8g2.setFont(u8g2_font_profont22_mf);
@@ -290,7 +290,7 @@ static void rlcd_draw_rest(bool asleep)
     u8g2.setCursor(tx, my + 70);
     u8g2.print(count.c_str());
 
-    u8g2.setFont(u8g2_font_profont22_tf);
+    u8g2.setFont(u8g2_font_profont17_tf);
 
     // ---- the way back ----
     const char *hint = asleep ? "Press any key" : "Any key to carry on";

@@ -141,12 +141,12 @@ void Help_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 {
     Menu_drawHeader(display, u8, "HELP");
 
-    u8->setFont(u8g2_font_profont22_tf);
+    u8->setFont(u8g2_font_profont17_tf);
     // Pitch is set by the JUMP column, the taller of the two - 9 rows have to fit
     // between the header and the footer. At profont22 the glyphs are 22 tall, so
     // the old 18 pitch overlapped them; 24 gives a row of air and still lands the
     // last row clear of the footer rule.
-    const int y0 = 52, pitch = 24;
+    const int y0 = 54, pitch = 18;
     drawColumn(display, u8, MENU_LEFT, N(MENU_LEFT), 8, 190, 12, y0, pitch);
     drawColumn(display, u8, MENU_RIGHT, N(MENU_RIGHT), 204, 392, 208, y0, pitch);
 
