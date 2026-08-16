@@ -4,6 +4,7 @@
 #include "display/display.h"
 #include "display/RLCD/display_RLCD.h"
 #include "service/Editor/Editor.h"
+#include "service/WifiEntry/WifiEntry.h"
 
 // Erase all notes + reset preferences. Connectivity (Wi-Fi creds, sync URL/git,
 // keyboard layout, time zone, device name) is KEPT so the device stays usable.
@@ -56,12 +57,22 @@ void FactoryReset_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *
 
 static void wipe(JsonDocument &app)
 {
+    // Rebuild the volume rather than unlinking slot by slot. An interrupted write
+    // (or the host and the firmware both writing the FAT in USB Drive mode) can
+    // leave clusters allocated to no file at all; deleting files never reclaims
+    // those, and once they fill the partition every save silently writes 0 bytes.
+    // Only fall back to per-file removes where format() isn't available.
+    bool formatted = gfs()->format();
+
     for (int i = 0; i < SLOT_MAX; i++)
     {
         String p = format("/%d.txt", i);
-        gfs()->remove(p.c_str());
-        gfs()->remove((p + "_backup.txt").c_str());
-        gfs()->remove((p + ".base64").c_str());
+        if (!formatted)
+        {
+            gfs()->remove(p.c_str());
+            gfs()->remove((p + "_backup.txt").c_str());
+            gfs()->remove((p + ".base64").c_str());
+        }
         const char *perSlot[] = {"title_%d", "title_manual_%d", "drive_id_%d",
                                  "gh_path_%d", "gh_sha_%d", "synced_modified_%d",
                                  "synced_hash_%d", "synced_title_%d", "synced_day_%d",
@@ -87,6 +98,13 @@ static void wipe(JsonDocument &app)
     if (f)
         f.close();
     config_save();
+
+    // A format took wifi.json with it; both config.json and the network list live
+    // in RAM, so writing them back is what keeps the "connectivity is kept"
+    // promise this screen makes.
+    if (formatted)
+        wifi_config_save();
+
     Editor::getInstance().loadFile("/0.txt");
 }
 

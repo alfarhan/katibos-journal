@@ -79,7 +79,7 @@ public:
         return _mounted;
     }
 
-    bool format()
+    bool format() override
     {
         bool wasMounted = _mounted;
 

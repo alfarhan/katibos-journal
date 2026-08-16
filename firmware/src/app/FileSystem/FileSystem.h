@@ -20,5 +20,8 @@ public:
     // it return 0 and the screen omits the gauge.
     virtual size_t totalBytes() { return 0; }
     virtual size_t usedBytes() { return 0; }
+    // Rebuild the volume. Backends that can't (host FS) return false and the
+    // caller falls back to deleting the files it knows about.
+    virtual bool format() { return false; }
     virtual ~FileSystem() = default;
 };

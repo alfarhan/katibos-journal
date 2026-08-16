@@ -1131,8 +1131,13 @@ void WP_render_status(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             }
         }
 
+        // A failed save outranks everything else here and does NOT time out - the
+        // writing is only in RAM until it clears.
+        if (!app["save_error"].isNull())
+            toast = app["save_error"].as<String>() + " - NOT SAVED";
+
         // no sync notification active -> fall back to the save flash
-        if (toast.isEmpty() && millis() < saved_flash_until)
+        else if (toast.isEmpty() && millis() < saved_flash_until)
             toast = "SAVED";
 
         static int prevBoxW = 0;
@@ -1211,7 +1216,9 @@ void WP_render_status(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     // (no placeholder), so the eye only catches the state it can act on. rev_8
     // runs its cell through a charger/step-up module with nothing on an ADC, so
     // there is no battery reading to put beside it.
-    String right = Editor::getInstance().saved ? String("SAVED") : String("");
+    String right = !app["save_error"].isNull() ? app["save_error"].as<String>()
+                   : Editor::getInstance().saved ? String("SAVED")
+                                                 : String("");
     if (!right.isEmpty())
     {
         u8->setCursor(SB_EDGE_RIGHT - u8->getUTF8Width(right.c_str()), STATUSBAR_Y);

@@ -332,6 +332,21 @@ bool Editor::saveFile()
 
         file.close();
 
+        // A full (or broken) volume makes print() return short - FFat reports no
+        // error, it just writes fewer bytes. Marking the buffer saved here is how
+        // writing gets lost silently: the bar flashes SAVED, the caret keeps
+        // moving, and the file on disk never grew. Fail loudly instead and leave
+        // `saved` false so the recovery snapshot stays and the next save retries.
+        if (length != (size_t)newLength)
+        {
+            app["save_error"] = "DISK FULL";
+            _log("Save failed: wrote %u of %u bytes (free %u)\n",
+                 (unsigned)length, (unsigned)newLength,
+                 (unsigned)(gfs()->totalBytes() - gfs()->usedBytes()));
+            savingInProgress = false;
+            return false;
+        }
+
         fileSize = seekPos + length;
         loadedLength = length;
     }
@@ -364,7 +379,7 @@ bool Editor::saveFile()
             ok = copyFileChunk(src, dst, seekPos); // prefix, unchanged
 
         if (ok)
-            dst.print(buffer); // this window's edited content
+            ok = dst.print(buffer) == (size_t)newLength; // this window's edited content
 
         if (ok && fileSize > windowEnd)
         {
@@ -400,6 +415,7 @@ bool Editor::saveFile()
 
     // flag to save
     this->saved = true;
+    app.remove("save_error");
 
     // the buffer now matches disk - drop the write-ahead snapshot
     clearRecovery();
