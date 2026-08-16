@@ -1515,9 +1515,14 @@ void WP_keyboard(int key, bool pressed, int index)
     // and drops straight back into the open file. Close on key-UP and swallow
     // both edges, so the dismiss key isn't reprocessed (e.g. Esc would otherwise
     // close the overlay AND open the menu) or typed into the document.
+    // `key != 0` is what makes it stay up. Releasing the chord that opened this
+    // reports key 0 - both the '/' and the layer key return 0 on key-up - so a
+    // bare !pressed test was satisfied the instant you let go, and the overlay
+    // only lived while the keys were held. Waiting for the key-up of a REAL key
+    // keeps the swallow-both-edges behaviour below and still ignores the chord.
     if (help_overlay)
     {
-        if (!pressed)
+        if (!pressed && key != 0)
         {
             help_overlay = false;
             // pageChanged forces a full clearDisplay + redraw so the overlay is
@@ -1591,6 +1596,28 @@ void WP_keyboard(int key, bool pressed, int index)
         config_save();
         applyStatusbarLayout(); // reclaim/release the bar's band for text
         Editor::getInstance().pageChanged = true; // full clear+redraw for the new layout
+        return;
+    }
+
+    // Ctrl+, / Ctrl+. leave the editor for Preferences or the settings cards
+    // directly, instead of Esc then hunting for the row. menu.goto is a one-shot
+    // Menu_setup consumes; prefs_from_editor is what makes Esc there come back
+    // HERE rather than to the menu, so it is a genuine round trip. Same save +
+    // clear-selection handling as the Esc path below - leaving the editor is
+    // leaving the editor however you do it.
+    // No !pressed guard, unlike the Esc path below: Esc arrives on both press and
+    // release, but the keypad emits these only on KEY_JUST_PRESSED, so a guard on
+    // release means the branch never runs at all. HELP_KEY takes the same single
+    // edge for the same reason.
+    if (key == OPTIONS_KEY || key == CARDS_KEY)
+    {
+        Editor::getInstance().saveFile();
+        Editor::getInstance().clearSelection();
+        clear_background = true;
+
+        app["menu"]["goto"] = (key == OPTIONS_KEY) ? MENU_PREFS : MENU_SETTINGS;
+        app["menu"]["prefs_from_editor"] = (key == OPTIONS_KEY);
+        app["screen"] = MENUSCREEN;
         return;
     }
 
