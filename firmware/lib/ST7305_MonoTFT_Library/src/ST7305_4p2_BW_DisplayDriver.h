@@ -65,7 +65,15 @@ private:
     uint8_t *invert_buffer = nullptr; // XOR scratch, allocated on first dark use
     SPIClass &spiRef;
 
-    void address();
+    // Dirty span in buffer rows, inclusive; empty when lo > hi. Widened only when
+    // a pixel's value actually CHANGES, not merely when one is written - the
+    // editor re-blits the whole page every tick, so tracking writes would mark
+    // everything and save nothing, while tracking changes marks just the edit.
+    int dirty_lo;
+    int dirty_hi;
+    void dirtyAll();
+
+    void address(int row_lo, int row_hi);
     void Write_Register(uint8_t idat);
     void Write_Parameter(uint8_t ddat);
 };

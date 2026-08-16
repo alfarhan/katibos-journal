@@ -41,6 +41,18 @@ ST7305_4p2_BW_DisplayDriver::ST7305_4p2_BW_DisplayDriver(
       spiRef(spi)
 {
     display_buffer = new uint8_t[DISPLAY_BUFFER_LENGTH];
+    dirtyAll();
+}
+
+// The buffer is row-major in real_y (index = real_y * LCD_DATA_WIDTH + real_x), and
+// for type 1 the 0x2B row window is 0..199, exactly the real_y range - so a row span
+// is both contiguous in RAM and directly addressable. That is the whole reason the
+// dirty span tracks rows and not columns: a column slice would need a strided gather
+// and a 0x2A window, for no gain on the case that actually matters.
+void ST7305_4p2_BW_DisplayDriver::dirtyAll()
+{
+    dirty_lo = 0;
+    dirty_hi = (DISPLAY_BUFFER_LENGTH / LCD_DATA_WIDTH) - 1;
 }
 
 ST7305_4p2_BW_DisplayDriver::~ST7305_4p2_BW_DisplayDriver()
@@ -75,12 +87,14 @@ void ST7305_4p2_BW_DisplayDriver::initialize()
 void ST7305_4p2_BW_DisplayDriver::fill(uint8_t data)
 {
     memset(display_buffer, data, DISPLAY_BUFFER_LENGTH);
+    dirtyAll();
     Serial.printf("fill data = 0x%x\n", data);
 }
 
 void ST7305_4p2_BW_DisplayDriver::clearDisplay()
 {
     memset(display_buffer, 0x00, DISPLAY_BUFFER_LENGTH);
+    dirtyAll();
 }
 
 void ST7305_4p2_BW_DisplayDriver::writePhysicalPoint(uint x, uint y, bool black)
@@ -108,10 +122,16 @@ void ST7305_4p2_BW_DisplayDriver::writePhysicalPoint(uint x, uint y, bool black)
     // py parity term - which 2-bit field is the even row is the one guess here.
     uint8_t shift = ((px & 1) == 0 ? 4 : 0) + ((py & 1) == 0 ? 2 : 0);
     uint8_t mask = 0x3 << shift;
-    if (black)
-        display_buffer[write_byte_index] |= mask;
-    else
-        display_buffer[write_byte_index] &= ~mask;
+    uint8_t prev = display_buffer[write_byte_index];
+    uint8_t next = black ? (uint8_t)(prev | mask) : (uint8_t)(prev & ~mask);
+    if (next == prev)
+        return;
+
+    display_buffer[write_byte_index] = next;
+    if ((int)real_y < dirty_lo)
+        dirty_lo = (int)real_y;
+    if ((int)real_y > dirty_hi)
+        dirty_hi = (int)real_y;
 #else
     if (x >= LCD_WIDTH || y >= LCD_HEIGHT)
         return;
@@ -147,7 +167,7 @@ void ST7305_4p2_BW_DisplayDriver::writePoint(uint x, uint y, uint16_t data)
     writePhysicalPoint(x, y, data != 0);
 }
 
-void ST7305_4p2_BW_DisplayDriver::address()
+void ST7305_4p2_BW_DisplayDriver::address(int row_lo, int row_hi)
 {
     Write_Register(0x2A);
 #if RLCD_TYPE == 1
@@ -159,41 +179,74 @@ void ST7305_4p2_BW_DisplayDriver::address()
 #endif
 
     Write_Register(0x2B);
+#if RLCD_TYPE == 1
+    Write_Parameter((uint8_t)(row_lo & 0xFF));
+    Write_Parameter((uint8_t)(row_hi & 0xFF));
+#else
+    // Type 2's buffer is column-major, so its rows are not this window's rows and
+    // a partial span would land in the wrong place. Always the full frame here.
+    (void)row_lo;
+    (void)row_hi;
     Write_Parameter(0x00);
     Write_Parameter(0xC7);
+#endif
 
     Write_Register(0x2C);
 }
 
 void ST7305_4p2_BW_DisplayDriver::display()
 {
-    address();
+    const int stride = LCD_DATA_WIDTH;
+#if RLCD_TYPE == 1
+    // Nothing on the glass differs from what the panel already holds. The panel
+    // refreshes from its own RAM, so the cheapest correct frame is no frame.
+    if (dirty_lo > dirty_hi)
+        return;
+
+    const int offset = dirty_lo * stride;
+    const int length = (dirty_hi - dirty_lo + 1) * stride;
+    address(dirty_lo, dirty_hi);
+#else
+    const int offset = 0;
+    const int length = DISPLAY_BUFFER_LENGTH;
+    address(0, (DISPLAY_BUFFER_LENGTH / stride) - 1);
+#endif
+
     digitalWrite(DC_PIN, HIGH);
     digitalWrite(CS_PIN, LOW);
 
     // Dark theme: send an inverted copy. XOR 0xFF flips every pixel for both
     // packings (type-1 full 0x0/0xF nibbles, type-2 1bpp). Sent from a scratch
     // buffer so the source framebuffer stays intact for the next partial draw.
-    uint8_t *out = display_buffer;
+    uint8_t *out = display_buffer + offset;
     if (m_invert)
     {
         if (!invert_buffer)
             invert_buffer = new uint8_t[DISPLAY_BUFFER_LENGTH];
         if (invert_buffer)
         {
-            for (int i = 0; i < DISPLAY_BUFFER_LENGTH; i++)
+            for (int i = offset; i < offset + length; i++)
                 invert_buffer[i] = display_buffer[i] ^ 0xFF;
-            out = invert_buffer;
+            out = invert_buffer + offset;
         }
     }
 
-    spiRef.writeBytes(out, DISPLAY_BUFFER_LENGTH);
+    spiRef.writeBytes(out, length);
     digitalWrite(CS_PIN, HIGH);
+
+    dirty_lo = DISPLAY_BUFFER_LENGTH / stride;
+    dirty_hi = -1;
 }
 
 void ST7305_4p2_BW_DisplayDriver::setInvert(bool enabled)
 {
+    if (m_invert == enabled)
+        return;
     m_invert = enabled;
+    // Every pixel's sent value flips even though the framebuffer is untouched, so
+    // the dirty span cannot see this - say so explicitly or the theme change would
+    // only reach whatever rows a later edit happened to touch.
+    dirtyAll();
 }
 
 void ST7305_4p2_BW_DisplayDriver::Initial_ST7305()
