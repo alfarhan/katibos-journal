@@ -75,10 +75,22 @@ void ota_check()
         return;
     }
 
+    _log("[ota] GET %s -> code=%d len=%d\n", url.c_str(), r.code, (int)r.body.length());
+
     JsonDocument doc;
-    if (deserializeJson(doc, r.body))
+    DeserializationError err = deserializeJson(doc, r.body);
+    if (err)
     {
-        setState(OTA_ERROR, "Bad update manifest");
+        // A captive portal answers 200 to everything with its own sign-in page,
+        // so the manifest arrives as HTML and "bad manifest" sends you hunting a
+        // URL that was never wrong. The TCP probe can't catch this either - the
+        // portal accepts the connection. The body is the first place the
+        // interception is actually visible, so name it here.
+        String head = r.body.substring(0, 200);
+        head.trim();
+        bool html = head.startsWith("<");
+        _log("[ota] manifest parse failed (%s): %.120s\n", err.c_str(), head.c_str());
+        setState(OTA_ERROR, html ? "Wi-Fi needs sign-in (portal)" : "Bad update manifest");
         return;
     }
     String version = doc["version"].as<String>();
