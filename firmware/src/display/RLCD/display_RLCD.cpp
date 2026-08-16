@@ -334,34 +334,11 @@ static void rlcd_idle_sleep(bool deep)
     rlcd_draw_rest(true);
 }
 
-// Depolarizing flush. YDP420H001-V3 is a NORMALLY WHITE reflective TFT, and on
-// those a long-held frame leaves DC bias trapped in the liquid crystal - the
-// image stays faintly visible under whatever is drawn next. Rewriting the same
-// white pixel does NOT lift it: the charge only relaxes while the pixel is
-// driven the OTHER way, so a clean boot (even off an erased chip) still shows
-// the ghost. Full black and full white alternately drive every pixel to both
-// polarities.
-//
-// Kept short deliberately. The dramatic ghost this was written for turned out to
-// be a wrong panel profile (see RLCD_TYPE in platformio.ini) rather than trapped
-// charge, and nothing parks this panel in LPM any more, so a long flush would be
-// boot time spent on a problem that no longer occurs. Two cycles is hygiene.
-static const int FLUSH_CYCLES = 2;
-static const int FLUSH_HOLD_MS = 150;
-
-static void rlcd_flush_retention()
-{
-  for (int i = 0; i < FLUSH_CYCLES; i++)
-  {
-    display.drawFilledRectangle(0, 0, 399, 299, ST7305_COLOR_BLACK);
-    display.display();
-    delay(FLUSH_HOLD_MS);
-
-    display.clearDisplay();
-    display.display();
-    delay(FLUSH_HOLD_MS);
-  }
-}
+// There used to be a depolarizing flush here - black/white cycles to drive every
+// pixel both polarities on boot. It was written for a ghost that turned out to be
+// a wrong panel profile (see RLCD_TYPE in platformio.ini), and nothing parks this
+// panel in LPM any more, so it was 600ms of flashing on every boot against a
+// problem that no longer occurs.
 
 void display_RLCD_setup()
 {
@@ -369,8 +346,6 @@ void display_RLCD_setup()
 
   // The display driver owns SPI setup and the complete supplier startup sequence.
   display.initialize();
-
-  rlcd_flush_retention();
 
   // connect u8g2 procedures to TFT_eSPI
   u8g2.begin(display);

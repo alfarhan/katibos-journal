@@ -98,13 +98,20 @@ void ST7305_4p2_BW_DisplayDriver::writePhysicalPoint(uint x, uint y, bool black)
     if (write_byte_index >= DISPLAY_BUFFER_LENGTH)
         return;
 
-    uint8_t color = black ? 0x0F : 0x00;
-    if ((px & 1) == 0)
-        display_buffer[write_byte_index] =
-            (display_buffer[write_byte_index] & 0x0F) | (color << 4);
+    // One byte holds FOUR pixels at 2 bits each, not two at a nibble each:
+    // 30000 bytes * 4 = 120000 = exactly this panel's 300x400 dots. Selecting
+    // only on px&1 and writing a whole 0x0F nibble threw the low bit of py away,
+    // so py and py+1 collided in one nibble and the second write won - and since
+    // py is the UI's x, that halved horizontal resolution and doubled every
+    // vertical stem. Arabic naskh carries its letterforms in that axis, which is
+    // why alef-lam came out the wrong width. If rows interleave wrong, flip the
+    // py parity term - which 2-bit field is the even row is the one guess here.
+    uint8_t shift = ((px & 1) == 0 ? 4 : 0) + ((py & 1) == 0 ? 2 : 0);
+    uint8_t mask = 0x3 << shift;
+    if (black)
+        display_buffer[write_byte_index] |= mask;
     else
-        display_buffer[write_byte_index] =
-            (display_buffer[write_byte_index] & 0xF0) | color;
+        display_buffer[write_byte_index] &= ~mask;
 #else
     if (x >= LCD_WIDTH || y >= LCD_HEIGHT)
         return;
@@ -374,7 +381,11 @@ void ST7305_4p2_BW_DisplayDriver::Initial_ST7305()
     Write_Parameter(0XFF);
 
 #if RLCD_TYPE == 1
-    Write_Register(0x39); // LPM
+    // The supplier sheet ends here in LPM, but initialize() switches straight to
+    // HPM and this panel is never parked in LPM afterwards. Coming up in HPM
+    // directly means no mode switch to race: the booster ramps once, during the
+    // init delays, instead of again under the first frame.
+    Write_Register(0x38); // HPM
     Write_Register(0x29); // DISPLAY ON
 #else
     Write_Register(0x38); // HPM
