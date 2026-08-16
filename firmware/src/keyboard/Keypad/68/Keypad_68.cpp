@@ -44,7 +44,7 @@ int layers[LAYERS][ROWS * COLS] = {
     {// normal layers
      27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b', 127,
      ' ', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n', 22,
-     0, 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '\\', 23,
+     16, 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '\\', 23,
      14, '`', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 14, 20, 3,
      17, 17, 17, ' ', 17, 17, 2, 18, 21, 19,
      MENU},
@@ -52,7 +52,7 @@ int layers[LAYERS][ROWS * COLS] = {
     {// when shift is pressed
      27, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b', 127,
      ' ', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n', 22,
-     0, 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '|', 23,
+     16, 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '|', 23,
      14, '~', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 14, 20, 3,
      17, 17, 17, ' ', 17, 17, 2, 18, 21, 19,
      MENU},
@@ -60,7 +60,7 @@ int layers[LAYERS][ROWS * COLS] = {
     {// alt layer
      27, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1000, '-', '=', '\b', 127,
      ' ', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n', 22,
-     0, 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '\\', 23,
+     16, 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '\\', 23,
      14, '`', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 14, 20, 3,
      17, 17, 17, ' ', 17, 17, 2, 18, 21, 19,
      MENU},
@@ -68,7 +68,7 @@ int layers[LAYERS][ROWS * COLS] = {
     {// alt layer shift
      27, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1000, '-', '=', '\b', 127,
      ' ', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n', 22,
-     0, 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '|', 23,
+     16, 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '|', 23,
      14, '~', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 14, 20, 3,
      17, 17, 17, ' ', 17, 17, 2, 18, 21, 19,
      MENU},
@@ -246,6 +246,18 @@ int keyboard_keypad_68_get_key(keypadEvent e)
             return 0;
         }
     }
+    // Caps Lock (16) toggles the typing layout. It was 0 on all four layers - the
+    // best-placed dead key on the board - and switching Arabic<->English is the
+    // thing a bilingual writer does most often mid-sentence, so it earns a single
+    // key instead of only the Fn+Space chord (which still works). Read off layer 0
+    // before the layer resolution below, like Shift and the layer key, so it fires
+    // whatever else is held down.
+    else if (key == 16)
+    {
+        if (e.bit.EVENT == KEY_JUST_PRESSED)
+            keyboard_toggle_layout();
+        return 0;
+    }
     else if (key == 14)
     {
         if (e.bit.EVENT == KEY_JUST_PRESSED)
@@ -299,6 +311,12 @@ int keyboard_keypad_68_get_key(keypadEvent e)
         return (e.bit.EVENT == KEY_JUST_PRESSED) ? HELP_KEY : 0;
     if (_fn_pressed && key == 'g')
         return (e.bit.EVENT == KEY_JUST_PRESSED) ? AI_PROOFREAD : 0;
+    // Fn + Shift + U syncs everything (^Sh+U in Help), and MUST come before the
+    // plain Fn+U or sync-file would swallow it. Note the 'U': with Shift held the
+    // layer is 3, whose letter table is uppercase, so a lowercase test silently
+    // never matches - the trap that makes shifted chords look unimplemented.
+    if (_fn_pressed && _shift_pressed && (key == 'U' || key == 'u'))
+        return (e.bit.EVENT == KEY_JUST_PRESSED) ? SYNC_ALL : 0;
     if (_fn_pressed && key == 'u')
         return (e.bit.EVENT == KEY_JUST_PRESSED) ? SYNC : 0;
 
@@ -317,6 +335,43 @@ int keyboard_keypad_68_get_key(keypadEvent e)
         case 'z': return UNDO;
         case 'y': return REDO;
         }
+    }
+
+    // Fn + Left/Right jumps by word, and with Shift selects by word - the ^L/R and
+    // ^Sh L/R that Help has always advertised. They only ever worked over HID:
+    // keyboard.cpp gates WORD_LEFT/WORD_RIGHT on a real ctrl, and rev_8 has no
+    // Ctrl in the firmware sense (Ctrl, Win and Fn are all the ALT layer key), so
+    // on the only keyboard this board has the chord was unreachable. The alt layer
+    // leaves the arrows as plain 18/19, so it was free to take.
+    //
+    // Deliberately NOT gated on KEY_JUST_PRESSED, unlike the Fn+letter chords:
+    // holding it should walk word by word, the same way the arrows and the
+    // Shift+arrow selection below repeat.
+    // Fn + Up/Dn jumps a paragraph and Fn + Home/End goes to the document ends -
+    // the ^Up/Dn and ^Home/End that Help lists. Same story as word jump: gated on
+    // a real ctrl in keyboard.cpp, and this board has no ctrl, so they were
+    // advertised and unreachable. Like the arrows these repeat when held.
+    if (_fn_pressed)
+    {
+        switch (key)
+        {
+        case 18: return _shift_pressed ? SEL_WORD_LEFT : WORD_LEFT;
+        case 19: return _shift_pressed ? SEL_WORD_RIGHT : WORD_RIGHT;
+        case 20: return PARA_UP;
+        case 21: return PARA_DOWN;
+        case 2:  return DOC_TOP;
+        case 3:  return DOC_BOTTOM;
+        }
+    }
+
+    // Fn + , / . jump from the editor to Preferences / the settings cards. Both
+    // are one-shot presses, so they take the JUST_PRESSED guard the other
+    // Fn+letter chords use - holding them must not re-enter the screen.
+    if (_fn_pressed && (key == ',' || key == '.'))
+    {
+        if (e.bit.EVENT != KEY_JUST_PRESSED)
+            return 0;
+        return (key == ',') ? OPTIONS_KEY : CARDS_KEY;
     }
 
     // Shift + arrow/Home/End extends the selection (SEL_* codes). The selection

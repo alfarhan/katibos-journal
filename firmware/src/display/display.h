@@ -88,9 +88,15 @@
 // open the editor shortcut overlay (Ctrl+/ or Ctrl+?) — any key returns to the file
 #define HELP_KEY 1125
 
-// open the in-editor Editor Options panel (Ctrl+,) — navigable, configures
-// scroll mode / status bar while a file is open
+// jump from the editor straight to Preferences (Ctrl+,). Esc there comes back to
+// the editor rather than the menu, via menu.prefs_from_editor. Once described an
+// in-editor options panel that no longer exists; the code was left defined but
+// unhandled when that panel folded into Preferences.
 #define OPTIONS_KEY 1126
+
+// jump from the editor to the settings cards (Ctrl+.) — same one-shot menu.goto
+// route as OPTIONS_KEY, landing on the cards half of MENU_HOME
+#define CARDS_KEY 1128
 
 // send the open file to the AI speller and replace it with the result (Ctrl+G)
 #define AI_PROOFREAD 1127

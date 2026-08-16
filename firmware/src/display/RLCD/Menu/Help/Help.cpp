@@ -31,8 +31,9 @@ static const HelpLine EDIT_LEFT[] = {
     {"^U", "Sync file", false},
     {"^G", "AI proofread", false},
     {"^Sh+U", "Sync all", false},
-    {"^Space", "Layout", false},
+    {"Caps/^Space", "Layout", false},
     {"^H", "Status bar", false},
+    {"^, / ^.", "Prefs/cards", false},
     {"ESC", "Open menu", false},
 };
 // Movement ordered by how far it takes you - char, word, paragraph, line, page,
