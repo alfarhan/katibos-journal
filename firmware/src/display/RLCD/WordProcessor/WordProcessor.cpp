@@ -71,14 +71,20 @@ const char *WP_fontName(int i)
 //
 // Anything that changes this must go through WP_applyFont(): wp_arabicW[] caches
 // advances per codepoint and is only valid for the face they were measured with.
+// Resolved in WP_applyFont, never read from config here. WP_selectFont runs at
+// least twice per cell (once to measure, once to draw) plus once per harakat, so
+// an ArduinoJson key lookup in this path is thousands of string compares per
+// frame - it measurably slowed typing when it was read live.
+static bool wp_plex = true;
+
 bool wp_arabic_is_plex()
 {
-    return (status()["config"]["arabic_font"] | 1) != 0;
+    return wp_plex;
 }
 
 static const uint8_t *WP_arabicFace()
 {
-    return wp_arabic_is_plex() ? wp_font->arabic : u8g2_font_10x20_t_arabic;
+    return wp_plex ? wp_font->arabic : u8g2_font_10x20_t_arabic;
 }
 
 // setFont() resets the scale, so the two always travel together - never call
@@ -367,6 +373,10 @@ void WP_applyFont(int index)
     if (index < 0 || index >= WP_FONT_COUNT)
         index = 0;
     wp_font = &WP_FONTS[index];
+
+    // Before any measuring below: the calls under this line select fonts, and
+    // WP_arabicFace() reads this rather than the config.
+    wp_plex = (status()["config"]["arabic_font"] | 1) != 0;
 
     wp_latinW = 0;
     for (int k = 0; k < 256; k++)
