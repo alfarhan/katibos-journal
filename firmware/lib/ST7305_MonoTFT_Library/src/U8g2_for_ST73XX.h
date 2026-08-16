@@ -132,6 +132,15 @@ struct _u8g2_font_t
                                2 doubles every pixel (thin 16px unicode fonts
                                become solid 32px on the low-contrast panel).
                                reset to 1 whenever the font changes. */
+
+  uint8_t embolden;         /* widen ink by one pixel along x, native size kept.
+                               scale 2 also gives 2px stems but costs double the
+                               glyph; this buys the weight alone. Extends each
+                               run LEFTWARD, not rightward: in opaque mode a
+                               background run starts exactly where the ink run
+                               ended, so a rightward extension is overdrawn by
+                               the very next run and vanishes. Reset by setFont
+                               like scale. */
 };
 typedef struct _u8g2_font_t u8g2_font_t;
 
@@ -161,7 +170,7 @@ class U8G2_FOR_ST73XX : public Print {
     int16_t getCursorX(void) { return tx; }
     int16_t getCursorY(void) { return ty; }
   
-    U8G2_FOR_ST73XX(void) {u8g2.font = NULL; u8g2.font_decode.fg_color = 1; u8g2.font_decode.is_transparent = 1; u8g2.font_decode.dir = 0; u8g2.scale = 1; home(); }
+    U8G2_FOR_ST73XX(void) {u8g2.font = NULL; u8g2.font_decode.fg_color = 1; u8g2.font_decode.is_transparent = 1; u8g2.font_decode.dir = 0; u8g2.scale = 1; u8g2.embolden = 0; home(); }
     // void begin(Adafruit_GFX &gfx) { u8g2.gfx = &gfx; }
     void begin(ST73XX_UI &dis) { u8g2.display = &dis; }
     void setFont(const uint8_t *font)             // set u8g2 font
@@ -172,6 +181,8 @@ class U8G2_FOR_ST73XX : public Print {
       { u8g2_SetFontDirection(&u8g2, d); }
     void setScale(uint8_t s)                      // integer glyph scaling (2 = pixel doubling); setFont resets it to 1
       { u8g2.scale = (s == 0) ? 1 : s; }
+    void setEmbolden(uint8_t b)                   // widen ink 1px at native size; setFont resets it to 0
+      { u8g2.embolden = b ? 1 : 0; }
     void setForegroundColor(uint16_t fg)           // Use this color to draw the text
       { u8g2_SetForegroundColor(&u8g2, fg); }
     void setBackgroundColor(uint16_t bg)           // only used for setFontMode(0)

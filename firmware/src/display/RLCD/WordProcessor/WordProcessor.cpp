@@ -38,12 +38,17 @@ struct EditorFont
     uint8_t arabicScale;
     int width; // Latin advance, corrected by measurement at setup
     int pitch; // baseline-to-baseline at Normal line spacing
+    bool bold;  // widen ink 1px (setEmbolden) instead of doubling the glyph
 };
 
 static EditorFont WP_FONTS[] = {
-    {"Normal", u8g2_font_profont22_mf, 1, u8g2_font_10x20_t_arabic, 1, 12, 22},
-    {"Large", u8g2_font_profont29_mf, 1, u8g2_font_10x20_t_arabic, 1, 16, 29},
-    {"Bold", u8g2_font_profont15_mf, 2, u8g2_font_cu12_t_arabic, 2, 18, 30},
+    {"Normal", u8g2_font_profont22_mf, 1, u8g2_font_10x20_t_arabic, 1, 12, 22, false},
+    {"Large", u8g2_font_profont29_mf, 1, u8g2_font_10x20_t_arabic, 1, 16, 29, false},
+    // Bold is Normal's faces with ink widened a pixel, NOT a small face doubled.
+    // Both give 2px stems - the reason this panel needs any of it - but doubling
+    // cost 2x the glyph, so "Bold" used to mean "Bold and much bigger" and lost
+    // you lines and characters per line. Same size as Normal now, just heavier.
+    {"Bold", u8g2_font_profont22_mf, 1, u8g2_font_10x20_t_arabic, 1, 12, 22, true},
 };
 static const int WP_FONT_COUNT = (int)(sizeof(WP_FONTS) / sizeof(WP_FONTS[0]));
 static EditorFont *wp_font = &WP_FONTS[0];
@@ -68,6 +73,7 @@ static void WP_selectFont(U8G2_FOR_ST73XX *u8, bool arabic)
         u8->setFont(wp_font->latin);
         u8->setScale(wp_font->latinScale);
     }
+    u8->setEmbolden(wp_font->bold);
 }
 
 //

@@ -331,6 +331,18 @@ static void u8g2_font_decode_len(u8g2_font_t *u8g2, uint8_t len, uint8_t is_fore
            coordinates and the run length are multiplied by scale, and the
            run is repeated scale times shifted one pixel across the run
            direction. scale==1 reproduces the original single line. */
+        /* embolden widens ink only, and leftward - see the field's comment in
+           the header for why rightward cannot work in opaque mode. Widening the
+           background too would just reprint the gap one pixel fatter and eat
+           the neighbouring glyph's stem. */
+        int16_t run_off = 0;
+        int16_t run_len = (int16_t)current * scale;
+        if ( u8g2->embolden && is_foreground )
+        {
+          run_off = -1;
+          run_len += 1;
+        }
+
         for ( uint8_t s = 0; s < scale; s++ )
         {
           /* get target position */
@@ -338,10 +350,10 @@ static void u8g2_font_decode_len(u8g2_font_t *u8g2, uint8_t len, uint8_t is_fore
           y = decode->target_y;
 
           /* apply rotation */
-          x = u8g2_add_vector_x(x, (int16_t)lx * scale, (int16_t)ly * scale + s, decode->dir);
-          y = u8g2_add_vector_y(y, (int16_t)lx * scale, (int16_t)ly * scale + s, decode->dir);
+          x = u8g2_add_vector_x(x, (int16_t)lx * scale + run_off, (int16_t)ly * scale + s, decode->dir);
+          y = u8g2_add_vector_y(y, (int16_t)lx * scale + run_off, (int16_t)ly * scale + s, decode->dir);
 
-          u8g2_draw_hv_line(u8g2, x, y, (int16_t)current * scale, decode->dir, color);
+          u8g2_draw_hv_line(u8g2, x, y, run_len, decode->dir, color);
         }
       }
     }
@@ -612,6 +624,7 @@ void u8g2_SetFont(u8g2_font_t *u8g2, const uint8_t  *font)
     u8g2->font = font;
     u8g2->font_decode.is_transparent = 0;
     u8g2->scale = 1; /* scaling is opt-in per font - call setScale() after setFont() */
+    u8g2->embolden = 0; /* same: opt in with setEmbolden() after setFont() */
 
     u8g2_read_font_info(&(u8g2->font_info), font);
   }
