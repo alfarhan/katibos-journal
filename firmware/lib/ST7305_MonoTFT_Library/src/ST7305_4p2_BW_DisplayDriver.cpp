@@ -434,11 +434,15 @@ void ST7305_4p2_BW_DisplayDriver::Initial_ST7305()
     Write_Parameter(0XFF);
 
 #if RLCD_TYPE == 1
-    // The supplier sheet ends here in LPM, but initialize() switches straight to
-    // HPM and this panel is never parked in LPM afterwards. Coming up in HPM
-    // directly means no mode switch to race: the booster ramps once, during the
-    // init delays, instead of again under the first frame.
-    Write_Register(0x38); // HPM
+    // End in LPM as the supplier sheet does, even though initialize() switches to
+    // HPM immediately after and nothing parks this panel in LPM later. The point
+    // is the TRANSITION: 0x38 re-ramps the booster only when the panel is not
+    // already in HPM. On a soft restart (ESP.restart(), the Restart menu item) the
+    // panel never loses power and is still in HPM from the previous session, so
+    // coming up in HPM made High_Power_Mode() a no-op - the bias voltages kept
+    // whatever the last session left and the whole screen came back grey and
+    // washed out until the cable was pulled. Cold boot hid it completely.
+    Write_Register(0x39); // LPM - so the HPM in initialize() is a real transition
     Write_Register(0x29); // DISPLAY ON
 #else
     Write_Register(0x38); // HPM
