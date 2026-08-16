@@ -17,6 +17,7 @@ enum
     R_HEAD = 0, // non-selectable section header
     R_THEME,
     R_FONT,
+    R_ARFONT,
     R_SPACE,
     R_FLOW,
     R_STATUS,
@@ -40,6 +41,7 @@ static const PRow ROWS[] = {
     {R_HEAD, "EDITOR"},
     {R_THEME, "Theme"},
     {R_FONT, "Font"},
+    {R_ARFONT, "Arabic font"},
     {R_SPACE, "Line spacing"},
     {R_FLOW, "Text flow"},
     {R_STATUS, "Status bar"},
@@ -88,6 +90,8 @@ static String valueStr(JsonDocument &app, int type)
         return app["config"]["theme_dark"].as<bool>() ? "Dark" : "Light";
     case R_FONT:
         return WP_fontName((app["config"]["font"] | 0) % WP_fontCount());
+    case R_ARFONT:
+        return (app["config"]["arabic_font"] | 1) != 0 ? "IBM Plex" : "Default";
     case R_SPACE:
         return SPACE_LBL[(app["config"]["line_spacing"] | 0) % 4];
     case R_FLOW:
@@ -145,6 +149,12 @@ static void cycle(JsonDocument &app, int type, int dir)
         WP_applyFont(i);
         break;
     }
+    case R_ARFONT:
+        // Through WP_applyFont for the same reason as R_FONT: wp_arabicW[] holds
+        // advances measured with the outgoing face and would otherwise be reused.
+        app["config"]["arabic_font"] = ((app["config"]["arabic_font"] | 1) != 0) ? 0 : 1;
+        WP_applyFont(app["config"]["font"] | 0);
+        break;
     case R_SPACE:
         app["config"]["line_spacing"] = (((app["config"]["line_spacing"] | 0) + (dir > 0 ? 1 : 3)) % 4);
         break;

@@ -34,7 +34,11 @@ U8G2_FOR_ST73XX u8g2;
 // (OPEN/ADD/SCAN/DEFAULT/BACK) is wider than the panel. Keeping them at 17 also
 // leaves the y=276/296 footer geometry every screen shares exactly as it was.
 #define HINT_FONT u8g2_font_profont17_tf
-#define LBL_FONT_ARABIC u8g2_font_10x20_t_arabic
+// Arabic labels follow the editor's Arabic font setting, or a file title would
+// render in a different face from the same text inside the editor. Menu geometry
+// survives the switch because every Arabic label is measured, not assumed
+// (RLCD_shapedLabelWidth, Home_fitTitle).
+#define LBL_FONT_ARABIC (wp_arabic_is_plex() ? u8g2_font_ibmplex_arabic_m : u8g2_font_10x20_t_arabic)
 
 // Shape + lay out a label, drawing it only when `draw` is set. Measuring runs
 // the identical path, so a centered label is placed with the exact width it

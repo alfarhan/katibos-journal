@@ -40,4 +40,7 @@ String formatNumberWithCommas(long num);
 int WP_fontCount();
 const char *WP_fontName(int index);
 void WP_applyFont(int index);
+// config.arabic_font: true = the profile's IBM Plex face, false = stock 10x20.
+// Also drives Arabic menu labels, so a file title matches the editor.
+bool wp_arabic_is_plex();
 void WP_invalidateWidthCache();

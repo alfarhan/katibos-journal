@@ -64,13 +64,30 @@ const char *WP_fontName(int i)
     return (i >= 0 && i < WP_FONT_COUNT) ? WP_FONTS[i].name : "";
 }
 
+// Which Arabic face the profile's Arabic slot resolves to. `arabic_font` 1 (the
+// default) uses the profile's own IBM Plex face; 0 falls back to the stock
+// 10x20 face for every profile - it exists in one size only, so with Default
+// selected Large and Bold enlarge the LATIN half alone.
+//
+// Anything that changes this must go through WP_applyFont(): wp_arabicW[] caches
+// advances per codepoint and is only valid for the face they were measured with.
+bool wp_arabic_is_plex()
+{
+    return (status()["config"]["arabic_font"] | 1) != 0;
+}
+
+static const uint8_t *WP_arabicFace()
+{
+    return wp_arabic_is_plex() ? wp_font->arabic : u8g2_font_10x20_t_arabic;
+}
+
 // setFont() resets the scale, so the two always travel together - never call
 // setFont directly for editor text.
 static void WP_selectFont(U8G2_FOR_ST73XX *u8, bool arabic)
 {
     if (arabic)
     {
-        u8->setFont(wp_font->arabic);
+        u8->setFont(WP_arabicFace());
         u8->setScale(wp_font->arabicScale);
     }
     else
