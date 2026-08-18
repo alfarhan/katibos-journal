@@ -809,6 +809,19 @@ static int WP_line_bytes(int line_num, char **start_out)
     return byteLen;
 }
 
+// Did this line end because the text wrapped, rather than on a typed Return?
+// The wrapper breaks after a space, so a trailing space cannot tell the two
+// apart - a line whose last word is followed by a space and then Return looks
+// identical. Ask the break itself instead: a hard break leaves the '\n' as the
+// byte before the next line starts.
+static bool WP_line_soft_wrapped(int line_num)
+{
+    Editor &ed = Editor::getInstance();
+    if (line_num >= ed.totalLine)
+        return false;
+    return ed.linePositions[line_num + 1][-1] != '\n';
+}
+
 // Is the active layout Arabic? Used so an empty line defaults to RTL.
 static bool WP_layout_rtl()
 {
@@ -872,11 +885,10 @@ void WP_render_line(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, i
     for (int c = 0; c < n; c++)
         total += WP_cell_width(u8, cells[c]);
 
-    // Justify only soft-wrapped lines (they end in a space; paragraph-final
-    // lines don't) and not the caret line (keeps the caret math simple). Other
-    // modes use a fixed alignment. Spaces between words carry the extra width.
-    char *rawb; int rawn = WP_line_bytes(line_num, &rawb);
-    bool justifyLine = (wp_align == ALIGN_JUSTIFY && rawn > 0 && rawb[rawn - 1] == ' ' &&
+    // Justify only soft-wrapped lines (a paragraph's last line keeps its natural
+    // edge) and not the caret line (keeps the caret math simple). Other modes
+    // use a fixed alignment. Spaces between words carry the extra width.
+    bool justifyLine = (wp_align == ALIGN_JUSTIFY && n > 0 && WP_line_soft_wrapped(line_num) &&
                         line_num != Editor::getInstance().cursorLine);
     int gaps = 0, extraBase = 0, extraRem = 0;
     if (justifyLine)
