@@ -38,7 +38,9 @@ void WP_keyboard(int key, bool pressed, int index = -1);
 int WP_fontCount();
 const char *WP_fontName(int index);
 void WP_applyFont(int index);
-// config.arabic_font: true = the profile's IBM Plex face, false = stock 10x20.
+// config.arabic_font indexes the Arabic face family (see WP_ARABIC).
 // Also drives Arabic menu labels, so a file title matches the editor.
-bool wp_arabic_is_plex();
+const uint8_t *wp_arabic_label_face(); // the family's menu-size face
+int wp_arabicFamilyCount();
+const char *wp_arabicFamilyName(int i);
 void WP_invalidateWidthCache();

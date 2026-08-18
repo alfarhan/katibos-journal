@@ -38,7 +38,7 @@ U8G2_FOR_ST73XX u8g2;
 // render in a different face from the same text inside the editor. Menu geometry
 // survives the switch because every Arabic label is measured, not assumed
 // (RLCD_shapedLabelWidth, Home_fitTitle).
-#define LBL_FONT_ARABIC (wp_arabic_is_plex() ? u8g2_font_ibmplex_arabic_m : u8g2_font_10x20_t_arabic)
+#define LBL_FONT_ARABIC (wp_arabic_label_face())
 
 // Title bars keep the SMALLER face while the body text grows. 1.13.0 raised both
 // together, because a header and a row label both come through LBL_FONT - and the

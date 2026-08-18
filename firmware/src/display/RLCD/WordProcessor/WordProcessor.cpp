@@ -34,7 +34,7 @@ struct EditorFont
     const char *name;
     const uint8_t *latin;
     uint8_t latinScale;
-    const uint8_t *arabic;
+    bool arabicLarge; // which face of the selected Arabic family this profile takes
     uint8_t arabicScale;
     int width; // Latin advance, corrected by measurement at setup
     int pitch; // baseline-to-baseline at Normal line spacing
@@ -47,13 +47,13 @@ struct EditorFont
 // Harakat are the tight case - maxH is 31/38/43 for stacked marks, so Compact
 // line spacing (pitch - 2) is where vowelled text would touch first.
 static EditorFont WP_FONTS[] = {
-    {"Normal", u8g2_font_profont22_mf, 1, u8g2_font_ibmplex_arabic_m, 1, 12, 22, false},
-    {"Large", u8g2_font_profont29_mf, 1, u8g2_font_ibmplex_arabic_l, 1, 16, 29, false},
+    {"Normal", u8g2_font_profont22_mf, 1, false, 1, 12, 22, false},
+    {"Large", u8g2_font_profont29_mf, 1, true, 1, 16, 29, false},
     // Bold is Normal's faces with ink widened a pixel, NOT a small face doubled.
     // Both give 2px stems - the reason this panel needs any of it - but doubling
     // cost 2x the glyph, so "Bold" used to mean "Bold and much bigger" and lost
     // you lines and characters per line. Same size as Normal now, just heavier.
-    {"Bold", u8g2_font_profont22_mf, 1, u8g2_font_ibmplex_arabic_m, 1, 12, 22, true},
+    {"Bold", u8g2_font_profont22_mf, 1, false, 1, 12, 22, true},
 };
 static const int WP_FONT_COUNT = (int)(sizeof(WP_FONTS) / sizeof(WP_FONTS[0]));
 static EditorFont *wp_font = &WP_FONTS[0];
@@ -64,27 +64,54 @@ const char *WP_fontName(int i)
     return (i >= 0 && i < WP_FONT_COUNT) ? WP_FONTS[i].name : "";
 }
 
-// Which Arabic face the profile's Arabic slot resolves to. `arabic_font` 1 (the
-// default) uses the profile's own IBM Plex face; 0 falls back to the stock
-// 10x20 face for every profile - it exists in one size only, so with Default
-// selected Large and Bold enlarge the LATIN half alone.
+// The Arabic face families, indexed by `config.arabic_font`. Index 0 and 1 are
+// pinned: existing configs already hold them, 1 being the default. Each family
+// carries the two sizes the profiles ask for, built to matching paragraph
+// heights (19 for m, 22 for l - bytes 15/16 of the u8g2 header), so switching
+// family does not move the line pitch. Stock 10x20 exists in one size only, so
+// under Default the Large profile enlarges the LATIN half alone.
 //
+// Every face here must cover FE70-FEFF - those are the shaped forms bidi emits,
+// and a font carrying only 0621-064A renders a blank for each one.
+struct ArabicFamily
+{
+    const char *name;
+    const uint8_t *m;
+    const uint8_t *l;
+};
+static const ArabicFamily WP_ARABIC[] = {
+    {"Default", u8g2_font_10x20_t_arabic, u8g2_font_10x20_t_arabic},
+    {"IBM Plex", u8g2_font_ibmplex_arabic_m, u8g2_font_ibmplex_arabic_l},
+    {"Plex Text", u8g2_font_plexreg_arabic_m, u8g2_font_plexreg_arabic_l},
+    {"Plex Med", u8g2_font_plexmed_arabic_m, u8g2_font_plexmed_arabic_l},
+    {"Vazirmatn", u8g2_font_vazir_arabic_m, u8g2_font_vazir_arabic_l},
+    {"Noto Sans", u8g2_font_noto_arabic_m, u8g2_font_noto_arabic_l},
+};
+static const int WP_ARABIC_COUNT = (int)(sizeof(WP_ARABIC) / sizeof(WP_ARABIC[0]));
+
+int wp_arabicFamilyCount() { return WP_ARABIC_COUNT; }
+const char *wp_arabicFamilyName(int i)
+{
+    return (i >= 0 && i < WP_ARABIC_COUNT) ? WP_ARABIC[i].name : "";
+}
+
 // Anything that changes this must go through WP_applyFont(): wp_arabicW[] caches
 // advances per codepoint and is only valid for the face they were measured with.
 // Resolved in WP_applyFont, never read from config here. WP_selectFont runs at
 // least twice per cell (once to measure, once to draw) plus once per harakat, so
 // an ArduinoJson key lookup in this path is thousands of string compares per
 // frame - it measurably slowed typing when it was read live.
-static bool wp_plex = true;
+static int wp_arabicFamily = 1;
 
-bool wp_arabic_is_plex()
+const uint8_t *wp_arabic_label_face()
 {
-    return wp_plex;
+    return WP_ARABIC[wp_arabicFamily].m;
 }
 
 static const uint8_t *WP_arabicFace()
 {
-    return wp_plex ? wp_font->arabic : u8g2_font_10x20_t_arabic;
+    const ArabicFamily &f = WP_ARABIC[wp_arabicFamily];
+    return wp_font->arabicLarge ? f.l : f.m;
 }
 
 // setFont() resets the scale, so the two always travel together - never call
@@ -376,7 +403,9 @@ void WP_applyFont(int index)
 
     // Before any measuring below: the calls under this line select fonts, and
     // WP_arabicFace() reads this rather than the config.
-    wp_plex = (status()["config"]["arabic_font"] | 1) != 0;
+    wp_arabicFamily = (status()["config"]["arabic_font"] | 1);
+    if (wp_arabicFamily < 0 || wp_arabicFamily >= WP_ARABIC_COUNT)
+        wp_arabicFamily = 1;
 
     wp_latinW = 0;
     for (int k = 0; k < 256; k++)

@@ -89,7 +89,7 @@ static String valueStr(JsonDocument &app, int type)
     case R_FONT:
         return WP_fontName((app["config"]["font"] | 0) % WP_fontCount());
     case R_ARFONT:
-        return (app["config"]["arabic_font"] | 1) != 0 ? "IBM Plex" : "Default";
+        return wp_arabicFamilyName((app["config"]["arabic_font"] | 1) % wp_arabicFamilyCount());
     case R_SPACE:
         return SPACE_LBL[(app["config"]["line_spacing"] | 0) % 4];
     case R_FLOW:
@@ -142,7 +142,10 @@ static void cycle(JsonDocument &app, int type, int dir)
     case R_ARFONT:
         // Through WP_applyFont for the same reason as R_FONT: wp_arabicW[] holds
         // advances measured with the outgoing face and would otherwise be reused.
-        app["config"]["arabic_font"] = ((app["config"]["arabic_font"] | 1) != 0) ? 0 : 1;
+    {
+        int n = wp_arabicFamilyCount();
+        app["config"]["arabic_font"] = (((app["config"]["arabic_font"] | 1) + (dir > 0 ? 1 : n - 1)) % n);
+    }
         WP_applyFont(app["config"]["font"] | 0);
         break;
     case R_SPACE:
