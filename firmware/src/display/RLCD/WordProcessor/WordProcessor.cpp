@@ -1063,8 +1063,8 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     // (the y=0 slot would clip the line), so there are `rows` rows: 0..rows-1.
     int lastRow = rows - 1;
 
-    static int topLine_persist = 0;
-    int topLine = editorTopLine(mode, cursorLine, lastRow, topLine_persist);
+    static int topLine_persist = EDITOR_TOP_UNSET;
+    int topLine = editorTopLine(mode, cursorLine, lastRow, topLine_persist, totalLine);
     topLine_persist = topLine;
 
     int caretRow = cursorLine - topLine;
@@ -1100,7 +1100,7 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             if (r == caretRow)
                 continue;
             int line = topLine + r;
-            if (line < 0 || line >= totalLine)
+            if (line < 0 || line > totalLine) // totalLine is the last index
                 continue;
             u8->setCursor(marginX, gridTop + r * linePitch);
             WP_render_line(display, u8, line);
@@ -1125,7 +1125,7 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             u8->setCursor(marginX, caretY - linePitch);
             WP_render_line(display, u8, cursorLine - 1);
         }
-        if (caretRow + 1 <= lastRow && cursorLine + 1 < totalLine &&
+        if (caretRow + 1 <= lastRow && cursorLine + 1 <= totalLine &&
             caretY + wp_descent > caretY + linePitch - font_height)
         {
             u8->setCursor(marginX, caretY + linePitch);
@@ -1138,19 +1138,21 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
     if (clear_background)
         u8->setFontMode(0);
-    else if (linePitch < font_height)
+    else
     {
         // Same seam in the partial path: the caret line was drawn opaque (it has
         // to be - it repaints over its own previous frame), so its background box
         // just ate the neighbours' overlapping rows. Put that ink back without
-        // painting any background over the caret line itself.
+        // painting any background over the caret line itself. Every spacing needs
+        // this, not just Compact: the box is the face's full height (37-40px on
+        // the Arabic faces), which overruns even Spacious pitch.
         u8->setFontMode(1);
         if (caretRow - 1 >= 0 && cursorLine - 1 >= 0)
         {
             u8->setCursor(marginX, caretY - linePitch);
             WP_render_line(display, u8, cursorLine - 1);
         }
-        if (caretRow + 1 <= lastRow && cursorLine + 1 < totalLine)
+        if (caretRow + 1 <= lastRow && cursorLine + 1 <= totalLine)
         {
             u8->setCursor(marginX, caretY + linePitch);
             WP_render_line(display, u8, cursorLine + 1);
