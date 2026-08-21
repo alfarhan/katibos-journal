@@ -98,6 +98,13 @@ static const ArabicFamily WP_ARABIC[] = {
     {"IBM Plex", u8g2_font_ibmplex_arabic_m, u8g2_font_ibmplex_arabic_l},
     {"Plex Clean", u8g2_font_plexclean_arabic_m, u8g2_font_plexclean_arabic_l},
     {"Plex Big", u8g2_font_plexbig_arabic_m, u8g2_font_plexbig_arabic_l},
+    // Plex Clean's rasterisation with every 1px-wide stroke evened out to 2px at
+    // build time (regenerate with tools/fonts/gen_tuned.py). This panel
+    // needs two adjacent dots to read black, so a 1px fragment is a stroke the
+    // eye loses - and the worst offenders were the DOTS under yeh/beh/teh/noon,
+    // which were 1px each. 115 such pixels down to 18, for 0.9% more ink: it
+    // evens the weight out without Bold's global gain.
+    {"Plex Tuned", u8g2_font_plextuned_arabic_m, u8g2_font_plextuned_arabic_l},
 };
 static const int WP_ARABIC_COUNT = (int)(sizeof(WP_ARABIC) / sizeof(WP_ARABIC[0]));
 

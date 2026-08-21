@@ -1129,6 +1129,8 @@ extern const uint8_t u8g2_font_plexclean_arabic_m[] U8G2_FONT_SECTION("u8g2_font
 extern const uint8_t u8g2_font_plexclean_arabic_l[] U8G2_FONT_SECTION("u8g2_font_plexclean_arabic_l");
 extern const uint8_t u8g2_font_plexbig_arabic_m[] U8G2_FONT_SECTION("u8g2_font_plexbig_arabic_m");
 extern const uint8_t u8g2_font_plexbig_arabic_l[] U8G2_FONT_SECTION("u8g2_font_plexbig_arabic_l");
+extern const uint8_t u8g2_font_plextuned_arabic_m[] U8G2_FONT_SECTION("u8g2_font_plextuned_arabic_m");
+extern const uint8_t u8g2_font_plextuned_arabic_l[] U8G2_FONT_SECTION("u8g2_font_plextuned_arabic_l");
 extern const uint8_t u8g2_font_unifont_t_symbols[] U8G2_FONT_SECTION("u8g2_font_unifont_t_symbols");
 extern const uint8_t u8g2_font_unifont_h_symbols[] U8G2_FONT_SECTION("u8g2_font_unifont_h_symbols");
 extern const uint8_t u8g2_font_unifont_t_emoticons[] U8G2_FONT_SECTION("u8g2_font_unifont_t_emoticons");
