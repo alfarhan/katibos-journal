@@ -907,6 +907,44 @@ static int WP_align_x(int align, bool rtl, int total)
     return x;
 }
 
+// Justification plan for one line: where it starts, and how much each interior
+// inter-word gap grows. Shared by the glyph renderer and the caret, so the caret
+// lands between the same two words the glyphs do. Before this existed the caret
+// line was simply excluded from justification to keep the caret arithmetic easy,
+// which meant a line visibly un-justified when the caret arrived and re-justified
+// when it left - words jumping under the cursor as it moved up and down.
+struct JustifyPlan
+{
+    bool on;
+    int x0;
+    int extraBase;
+    int extraRem;
+};
+
+static JustifyPlan WP_justifyPlan(int line_num, const bidi::Cell *cells, int n,
+                                  bool rtl, int total)
+{
+    JustifyPlan p = {false, 0, 0, 0};
+    if (wp_align == ALIGN_JUSTIFY && n > 0 && WP_line_soft_wrapped(line_num))
+    {
+        int gaps = 0;
+        for (int c = 1; c < n - 1; c++)
+            if (!cells[c].arabic && cells[c].glyph == ' ')
+                gaps++;
+        int extra = (screen_width - marginX - marginRight) - total;
+        if (gaps > 0 && extra > 0)
+        {
+            p.on = true;
+            p.x0 = marginX;
+            p.extraBase = extra / gaps;
+            p.extraRem = extra % gaps;
+        }
+    }
+    if (!p.on)
+        p.x0 = WP_align_x(wp_align == ALIGN_JUSTIFY ? ALIGN_AUTO : wp_align, rtl, total);
+    return p;
+}
+
 //
 // Draw one editor line at the baseline currently set on `u8` (via setCursor).
 // Arabic is shaped, the whole line reordered for bidi, and glyphs advanced by
@@ -926,29 +964,13 @@ void WP_render_line(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, i
     for (int c = 0; c < n; c++)
         total += WP_cell_width(u8, cells[c]);
 
-    // Justify only soft-wrapped lines (a paragraph's last line keeps its natural
-    // edge) and not the caret line (keeps the caret math simple). Other modes
-    // use a fixed alignment. Spaces between words carry the extra width.
-    bool justifyLine = (wp_align == ALIGN_JUSTIFY && n > 0 && WP_line_soft_wrapped(line_num) &&
-                        line_num != Editor::getInstance().cursorLine);
-    int gaps = 0, extraBase = 0, extraRem = 0;
-    if (justifyLine)
-    {
-        for (int c = 1; c < n - 1; c++)
-            if (!cells[c].arabic && cells[c].glyph == ' ')
-                gaps++;
-        int extra = (screen_width - marginX - marginRight) - total;
-        if (gaps > 0 && extra > 0)
-        {
-            extraBase = extra / gaps;
-            extraRem = extra % gaps;
-        }
-        else
-            justifyLine = false;
-    }
-
-    int x = justifyLine ? marginX
-                        : WP_align_x(wp_align == ALIGN_JUSTIFY ? ALIGN_AUTO : wp_align, rtl, total);
+    // Justify only soft-wrapped lines - a paragraph's last line keeps its natural
+    // edge. Other modes use a fixed alignment. Spaces between words carry the
+    // extra width, and the caret follows the same plan.
+    JustifyPlan jp = WP_justifyPlan(line_num, cells, n, rtl, total);
+    bool justifyLine = jp.on;
+    int extraBase = jp.extraBase, extraRem = jp.extraRem;
+    int x = jp.x0;
 
     // Selection range in absolute buffer bytes, and this line's byte offset, so
     // each visual cell can be tested for membership. This works for both LTR and
@@ -1065,8 +1087,13 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     caretBaselineY = caretY; // shared with WP_render_cursor
 
     // Full repaint: draw every visible row except the caret line (drawn last).
+    // Ink only (setFontMode(1)): the caller already cleared the panel, so no
+    // glyph needs its opaque background box - and at Compact spacing that box is
+    // 2px taller than the pitch, so in opaque mode every line clipped the bottom
+    // of the line above it.
     if (clear_background)
     {
+        u8->setFontMode(1);
         WP_selectFont(u8, false);
         for (int r = 0; r <= lastRow; r++)
         {
@@ -1108,6 +1135,28 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
 
     u8->setCursor(marginX, caretY);
     WP_render_line(display, u8, cursorLine);
+
+    if (clear_background)
+        u8->setFontMode(0);
+    else if (linePitch < font_height)
+    {
+        // Same seam in the partial path: the caret line was drawn opaque (it has
+        // to be - it repaints over its own previous frame), so its background box
+        // just ate the neighbours' overlapping rows. Put that ink back without
+        // painting any background over the caret line itself.
+        u8->setFontMode(1);
+        if (caretRow - 1 >= 0 && cursorLine - 1 >= 0)
+        {
+            u8->setCursor(marginX, caretY - linePitch);
+            WP_render_line(display, u8, cursorLine - 1);
+        }
+        if (caretRow + 1 <= lastRow && cursorLine + 1 < totalLine)
+        {
+            u8->setCursor(marginX, caretY + linePitch);
+            WP_render_line(display, u8, cursorLine + 1);
+        }
+        u8->setFontMode(0);
+    }
 }
 
 
@@ -1463,9 +1512,9 @@ void WP_render_cursor(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         wpx[c] = WP_cell_width(u8, cells[c]);
         total += wpx[c];
     }
-    // caret line is never justified (see WP_render_line), so the non-justify
-    // alignment matches where its glyphs are actually drawn
-    int x0 = WP_align_x(wp_align == ALIGN_JUSTIFY ? ALIGN_AUTO : wp_align, rtl, total);
+    // Same plan the glyphs were drawn with, stretched gaps included.
+    JustifyPlan jp = WP_justifyPlan(cursorLine, cells, n, rtl, total);
+    int x0 = jp.x0;
 
     // byte offset of the cursor within its line
     char *lineStart = Editor::getInstance().linePositions[cursorLine];
@@ -1481,11 +1530,19 @@ void WP_render_cursor(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         }
     if (v >= 0)
     {
-        cursorX = x0;                           // sum widths of cells before v
+        cursorX = x0; // sum widths of cells before v, plus any stretched gaps
+        int rem = jp.extraRem;
         for (int c = 0; c < v; c++)
+        {
             cursorX += wpx[c];
+            if (jp.on && c >= 1 && c < n - 1 && !cells[c].arabic && cells[c].glyph == ' ')
+            {
+                cursorX += jp.extraBase;
+                if (rem > 0) { cursorX += 1; rem--; }
+            }
+        }
     }
-    else                                        // end of the line's logical text
+    else // end of the line's logical text
         cursorX = rtl ? x0 : (x0 + total);
 
     // Blink the cursor every 500 ms
