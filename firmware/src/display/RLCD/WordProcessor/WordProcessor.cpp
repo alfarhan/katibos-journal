@@ -135,19 +135,21 @@ static const uint8_t *WP_arabicFace()
 
 // setFont() resets the scale, so the two always travel together - never call
 // setFont directly for editor text.
+// setFont() re-reads the face header and resets the scale, and this runs at least
+// twice per cell (measure, then draw) plus once per mark - several hundred times
+// a frame. Skip it when the face is already the one selected. The comparison
+// reads u8g2's own live state rather than a shadow copy, so a setFont() from
+// anywhere else (status bar, menu labels) can't leave this stale.
 static void WP_selectFont(U8G2_FOR_ST73XX *u8, bool arabic)
 {
-    if (arabic)
-    {
-        u8->setFont(WP_arabicFace());
-        u8->setScale(wp_font->arabicScale);
-    }
-    else
-    {
-        u8->setFont(wp_font->latin);
-        u8->setScale(wp_font->latinScale);
-    }
-    u8->setEmbolden(wp_font->bold);
+    const uint8_t *face = arabic ? WP_arabicFace() : wp_font->latin;
+    uint8_t scale = arabic ? wp_font->arabicScale : wp_font->latinScale;
+    uint8_t bold = wp_font->bold ? 1 : 0;
+    if (u8->u8g2.font == face && u8->u8g2.scale == scale && u8->u8g2.embolden == bold)
+        return;
+    u8->setFont(face);
+    u8->setScale(scale);
+    u8->setEmbolden(bold);
 }
 
 //
@@ -966,10 +968,16 @@ void WP_render_line(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, i
     bool rtl = false;
     int n = WP_layout(line_num, cells, 80, &rtl);
 
-    // total pixel width, to align the line
+    // total pixel width, to align the line. Cached for the draw pass below -
+    // measuring is a font select plus a getUTF8Width per cell, and doing it twice
+    // per glyph was the single biggest cost in this function.
+    static int cellw[80];
     int total = 0;
     for (int c = 0; c < n; c++)
-        total += WP_cell_width(u8, cells[c]);
+    {
+        cellw[c] = WP_cell_width(u8, cells[c]);
+        total += cellw[c];
+    }
 
     // Justify only soft-wrapped lines - a paragraph's last line keeps its natural
     // edge. Other modes use a fixed alignment. Spaces between words carry the
@@ -993,7 +1001,7 @@ void WP_render_line(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8, i
 
     for (int c = 0; c < n; c++)
     {
-        int w = WP_cell_width(u8, cells[c]);
+        int w = cellw[c];
 
         bool cellSelected = false;
         if (sel)

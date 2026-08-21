@@ -404,9 +404,22 @@ void display_RLCD_setup()
 void display_RLCD_loop()
 {
   static unsigned int last = millis();
+#ifdef RLCD_PERF
+  // Temporary instrumentation (env microjournal_perf). Reports, per tick that
+  // actually did work: how long since the previous tick started (gap), how long
+  // the render took, how long the SPI push took, and whether it pushed at all.
+  // The question it answers: while typing fast, is the render being skipped, or
+  // is each one simply slow?
+  static unsigned int perf_prev_start = 0;
+#endif
   if (millis() - last > RLCD_TICK_MS)
   {
     last = millis();
+#ifdef RLCD_PERF
+    unsigned int perf_t0 = millis();
+    unsigned int perf_gap = perf_prev_start ? (perf_t0 - perf_prev_start) : 0;
+    perf_prev_start = perf_t0;
+#endif
 
     idle_loop();
 
@@ -485,8 +498,17 @@ void display_RLCD_loop()
         shouldDisplay = Update_needsDisplay();
     }
 
+#ifdef RLCD_PERF
+    unsigned int perf_t1 = millis();
+#endif
     if (shouldDisplay)
       display.display();
+#ifdef RLCD_PERF
+    unsigned int perf_t2 = millis();
+    if ((perf_t1 - perf_t0) > 2 || shouldDisplay)
+      _log("PERF gap=%ums render=%ums push=%ums pushed=%d\n",
+           perf_gap, perf_t1 - perf_t0, perf_t2 - perf_t1, shouldDisplay ? 1 : 0);
+#endif
   }
 }
 
