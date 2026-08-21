@@ -1117,42 +1117,28 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     //
     // The caret line is the edit area, redrawn every tick. When we are NOT doing
     // a full-screen clear, the right-aligned RTL line shifts and reshapes as it
-    // grows, so painting over the previous frame leaves ghost glyphs behind.
-    // Clear just this line's band (one glyph-box tall) and repaint it, along with
-    // the neighbours the band overlaps: the line above dips its descenders into
-    // the top of it, and with a deep-descender face (wp_descent is 18 on the
-    // doubled Arabic) the bottom of the band now reaches into the ascenders of
-    // the line below. Repainting only the one above was safe while the caret sat
-    // on the last line - it is not once the caret moves up into the document.
+    // grows, so painting over the previous frame leaves ghost glyphs behind: clear
+    // this line's band and repaint it, plus the neighbours the band eats into (the
+    // line above dips descenders into the top of it, the line below puts ascenders
+    // under the bottom).
+    //
+    // ORDER MATTERS, and it is the whole fix. The caret line goes down first, in
+    // opaque mode, so it covers its own previous frame; the neighbours follow in
+    // ink-only mode, so nothing paints a background box over anything already
+    // drawn. Opaque boxes are the face's full height (37-40px on the Arabic
+    // faces), which overruns the pitch at EVERY line spacing - drawn last, the
+    // caret line clipped whichever neighbour came before it, which is why letter
+    // bottoms vanished while typing. Repainting the neighbours a second time to
+    // undo that worked, but cost five line renders per keystroke instead of three
+    // and typing felt it.
     if (!clear_background)
-    {
         display->drawFilledRectangle(0, caretY - font_height, screen_width, caretY + wp_descent, 0);
-        if (caretRow - 1 >= 0 && cursorLine - 1 >= 0)
-        {
-            u8->setCursor(marginX, caretY - linePitch);
-            WP_render_line(display, u8, cursorLine - 1);
-        }
-        if (caretRow + 1 <= lastRow && cursorLine + 1 <= totalLine &&
-            caretY + wp_descent > caretY + linePitch - font_height)
-        {
-            u8->setCursor(marginX, caretY + linePitch);
-            WP_render_line(display, u8, cursorLine + 1);
-        }
-    }
 
     u8->setCursor(marginX, caretY);
     WP_render_line(display, u8, cursorLine);
 
-    if (clear_background)
-        u8->setFontMode(0);
-    else
+    if (!clear_background)
     {
-        // Same seam in the partial path: the caret line was drawn opaque (it has
-        // to be - it repaints over its own previous frame), so its background box
-        // just ate the neighbours' overlapping rows. Put that ink back without
-        // painting any background over the caret line itself. Every spacing needs
-        // this, not just Compact: the box is the face's full height (37-40px on
-        // the Arabic faces), which overruns even Spacious pitch.
         u8->setFontMode(1);
         if (caretRow - 1 >= 0 && cursorLine - 1 >= 0)
         {
@@ -1164,8 +1150,8 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
             u8->setCursor(marginX, caretY + linePitch);
             WP_render_line(display, u8, cursorLine + 1);
         }
-        u8->setFontMode(0);
     }
+    u8->setFontMode(0);
 }
 
 
