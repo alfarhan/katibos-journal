@@ -164,6 +164,13 @@ unsigned int last_sleep = millis();
 // confirmation, then it disappears again.
 bool statusbar_hidden = false;
 unsigned int saved_flash_until = 0;
+String wp_ai_flash(); // defined below, next to the AI notice state it reads
+
+// Set by WP_contentChanged: this tick's only change was the caret blink, so the
+// text and the status bar are byte-identical to what is already on the panel.
+static bool wp_only_blink = false;
+// Set by WP_contentChanged: something the status bar actually shows moved.
+static bool wp_status_dirty = true;
 
 // Boot crash-recovery prompt: when a write-ahead snapshot survived an unclean
 // shutdown, the editor is frozen behind a modal until the writer picks Enter
@@ -667,17 +674,48 @@ void WP_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         return;
     }
 
+#ifdef RLCD_PERF
+    unsigned long p0 = millis();
+#endif
+    // A blink-only tick moves two pixels of caret bar. Repainting the text for it
+    // costs a BiDi layout, a measure and a blit of three lines (~34ms), and the
+    // status bar another ~16ms, to reproduce exactly what the panel already
+    // holds - and at the 500ms blink that ran twice a second forever, and once
+    // more between every pair of keystrokes.
+    if (wp_only_blink)
+    {
+        WP_render_cursor(display, u8);
+        Editor::getInstance().loop();
+        return;
+    }
+
     // CLEAR BACKGROUND
     WP_render_clear(display, u8);
+#ifdef RLCD_PERF
+    unsigned long p1 = millis();
+#endif
 
     // RENDER TEXT
     WP_render_text(display, u8);
+#ifdef RLCD_PERF
+    unsigned long p2 = millis();
+#endif
 
-    // RENDER STATUS BAR
-    WP_render_status(display, u8);
+    // RENDER STATUS BAR - only when something it shows actually moved. It is
+    // ~16ms (a shaped Arabic title, the word count, the chips) and on a plain
+    // keystroke none of it changes.
+    if (wp_status_dirty)
+        WP_render_status(display, u8);
+#ifdef RLCD_PERF
+    unsigned long p3 = millis();
+#endif
 
     // BLINK CURSOR
     WP_render_cursor(display, u8);
+#ifdef RLCD_PERF
+    _log("SPLIT clear=%lu text=%lu status=%lu cursor=%lu\n",
+         p1 - p0, p2 - p1, p3 - p2, millis() - p3);
+#endif
 
     //
     if (clear_background)
@@ -721,6 +759,33 @@ bool WP_contentChanged()
     int file_index = app["config"]["file_index"].as<int>();
     // flips every 500ms, matching WP_render_cursor()'s blink rate
     int blinkPhase = (millis() / 500) % 2;
+
+    bool nonBlink = clear_background ||
+                    cursorPos != cursorPos_prev ||
+                    cursorLinePos != cursorLinePos_prev ||
+                    bufferSize != bufferSize_prev ||
+                    saved != saved_prev ||
+                    wordCount != wordCount_prev ||
+                    file_index != file_index_prev ||
+                    selAnchor != selAnchor_prev ||
+                    layout != layout_prev;
+    wp_only_blink = !nonBlink && (blinkPhase != blinkPhase_prev);
+    // The status bar also owns the toasts - sync progress/result, the AI flash,
+    // the manual-save SAVED - and those come and go on their own timers rather
+    // than off any value compared here. While one can be on screen the bar stays
+    // dirty every tick, or a toast would either never appear or never clear.
+    static int syncState_prev = -1;
+    int syncState = app["sync_state"].as<int>();
+    bool toastLive = syncState != 0 || syncState != syncState_prev ||
+                     !wp_ai_flash().isEmpty() || millis() < saved_flash_until;
+    syncState_prev = syncState;
+
+    wp_status_dirty = clear_background ||
+                      saved != saved_prev ||
+                      wordCount != wordCount_prev ||
+                      file_index != file_index_prev ||
+                      layout != layout_prev ||
+                      toastLive;
 
     bool changed = clear_background ||
                    cursorPos != cursorPos_prev ||
@@ -1194,7 +1259,7 @@ static String sbUpper(const String &s)
 // uses (the two can't run at once). Empty when there is nothing to report; the
 // result lingers ~4s - longer than sync's 3s, because the "check _backup.txt"
 // note is the user's only pointer back to the original.
-static String wp_ai_flash()
+String wp_ai_flash()
 {
     JsonDocument &app = status();
     int st = app["ai_state"] | AI_IDLE;

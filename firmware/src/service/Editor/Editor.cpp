@@ -260,6 +260,9 @@ bool Editor::saveFile()
         return false;
     }
     savingInProgress = true;
+#ifdef RLCD_PERF
+    unsigned long perf_t_enter = millis();
+#endif
 
     //
     JsonDocument &app = status();
@@ -314,6 +317,9 @@ bool Editor::saveFile()
             return false;
         }
 
+#ifdef RLCD_PERF
+        unsigned long perf_open = millis();
+#endif
         // Seek to the last loaded offset
         if (!file.seek(seekPos))
         {
@@ -327,10 +333,21 @@ bool Editor::saveFile()
         _log("Writing file at: %d\n", seekPos);
 
         // writing the file content
+#ifdef RLCD_PERF
+        unsigned long perf_seek = millis();
+#endif
         size_t length = file.print(buffer);
+#ifdef RLCD_PERF
+        unsigned long perf_write = millis();
+#endif
         _log("File written: %d bytes\n", length);
 
         file.close();
+#ifdef RLCD_PERF
+        _log("SAVEPERF fast bytes=%u open=%lums seek=%lums write=%lums close=%lums\n",
+             (unsigned)length, perf_open - perf_t_enter, perf_seek - perf_open,
+             perf_write - perf_seek, millis() - perf_write);
+#endif
 
         // A full (or broken) volume makes print() return short - FFat reports no
         // error, it just writes fewer bytes. Marking the buffer saved here is how
@@ -1507,13 +1524,14 @@ void Editor::keyboardImpl(int key, bool pressed)
             this->saved = false;
         }
 
-        // update the screen buffer
-        updateScreen();
+        // update the screen buffer. The edit is at the caret, so the wrap can
+        // restart there instead of re-measuring the whole window.
+        updateScreen(cursorPos);
     }
 }
 
 //
-void Editor::updateScreen()
+void Editor::updateScreen(int fromPos)
 {
     // Loop through the text buffer
     // and product the data structure that is splitted in each line
@@ -1530,12 +1548,38 @@ void Editor::updateScreen()
         return;
     }
 
+    // Wrapping is greedy and left to right, so an edit at byte `fromPos` cannot
+    // change how any line BEFORE the one containing it breaks. Restarting from
+    // that line instead of byte 0 is what keeps typing in a long document as
+    // quick as typing in an empty one: the measurement callback shapes a whole
+    // Arabic word per call, so a full rebuild re-shapes every word in the window
+    // on every keystroke - hundreds of them in a 400-word file, none of which
+    // can have moved.
+    int startLine = 0;
+    if (fromPos > 0 && totalLine > 0)
+    {
+        // last line whose start is at or before the edit
+        int lo = 0, hi = totalLine;
+        while (lo < hi)
+        {
+            int mid = (lo + hi + 1) / 2;
+            if (linePositions[mid] - buffer <= fromPos)
+                lo = mid;
+            else
+                hi = mid - 1;
+        }
+        startLine = lo > 0 ? lo - 1 : 0; // one line of margin
+    }
+
     // first line is the first of the buffer
-    linePositions[0] = &buffer[0];
-    lineLengths[0] = 0;
+    if (startLine == 0)
+    {
+        linePositions[0] = &buffer[0];
+        lineLengths[0] = 0;
+    }
 
     //
-    this->totalLine = 0;
+    this->totalLine = startLine;
     int line_count = 0;
 
     // remember the last space position to use it for the word wrap
@@ -1554,7 +1598,7 @@ void Editor::updateScreen()
     int line_px = 0;        // accumulated pixel width of the current line
     int last_space_px = 0;  // line_px at the last space seen
 
-    int i = 0;
+    int i = (int)(linePositions[startLine] - buffer);
     while (i < BUFFER_SIZE)
     {
         char lead = buffer[i];

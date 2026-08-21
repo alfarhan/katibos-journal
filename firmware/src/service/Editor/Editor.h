@@ -231,7 +231,11 @@ public:
     void removeLastWord();
 
     //
-    void updateScreen();
+    // fromPos: byte offset of the edit, so the wrap can restart at the line
+    // containing it instead of rebuilding the whole window. -1 (the default)
+    // forces a full rebuild - use it whenever the buffer was replaced wholesale
+    // (load, window move, undo, paste of unknown extent).
+    void updateScreen(int fromPos = -1);
 
     // Column (code-point index) on a line -> absolute byte offset in buffer.
     int colToByte(int lineIdx, int col);
