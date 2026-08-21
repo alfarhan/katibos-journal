@@ -79,13 +79,25 @@ struct ArabicFamily
     const uint8_t *m;
     const uint8_t *l;
 };
+// All three Plex entries are the SAME typeface at the same weight - what differs
+// is how the outline was rasterised, which is where the jaggedness actually comes
+// from. Measured over every FE70-FEFF glyph of each candidate BDF:
+//
+//              isolated px   steps/ink   advance
+//   Plex (px21 hinted)   4       0.476     12.50   <- what shipped before
+//   Clean (px21 off)     0       0.467     12.10
+//   Big   (px23 hinted)  1       0.412     13.76
+//
+// Hinting grid-fits stems, which on Arabic curves throws off single stray pixels;
+// turning it off costs nothing in layout (the advance even narrows slightly). Big
+// trades ~10% of the characters per line for the flattest contours available -
+// px23 is the largest size whose paragraph height (20) still clears Compact line
+// spacing at pitch-2, so it does not cost a line.
 static const ArabicFamily WP_ARABIC[] = {
     {"Default", u8g2_font_10x20_t_arabic, u8g2_font_10x20_t_arabic},
     {"IBM Plex", u8g2_font_ibmplex_arabic_m, u8g2_font_ibmplex_arabic_l},
-    {"Plex Text", u8g2_font_plexreg_arabic_m, u8g2_font_plexreg_arabic_l},
-    {"Plex Med", u8g2_font_plexmed_arabic_m, u8g2_font_plexmed_arabic_l},
-    {"Vazirmatn", u8g2_font_vazir_arabic_m, u8g2_font_vazir_arabic_l},
-    {"Noto Sans", u8g2_font_noto_arabic_m, u8g2_font_noto_arabic_l},
+    {"Plex Clean", u8g2_font_plexclean_arabic_m, u8g2_font_plexclean_arabic_l},
+    {"Plex Big", u8g2_font_plexbig_arabic_m, u8g2_font_plexbig_arabic_l},
 };
 static const int WP_ARABIC_COUNT = (int)(sizeof(WP_ARABIC) / sizeof(WP_ARABIC[0]));
 
