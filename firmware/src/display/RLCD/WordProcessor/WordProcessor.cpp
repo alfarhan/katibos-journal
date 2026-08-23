@@ -718,7 +718,12 @@ void WP_render(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     // RENDER STATUS BAR - only when something it shows actually moved. It is
     // ~16ms (a shaped Arabic title, the word count, the chips) and on a plain
     // keystroke none of it changes.
-    if (wp_status_dirty)
+    // clear_background is re-evaluated here, not just via wp_status_dirty:
+    // WP_render_clear (above) raises it for a new caret line - which is what a
+    // wrap is - and that happens AFTER WP_contentChanged computed the flag. The
+    // frame that repaints everything was therefore the one frame that skipped
+    // the bar, so it blanked on every wrap and returned at the next real change.
+    if (wp_status_dirty || clear_background)
         WP_render_status(display, u8);
 #ifdef RLCD_PERF
     unsigned long p3 = millis();
