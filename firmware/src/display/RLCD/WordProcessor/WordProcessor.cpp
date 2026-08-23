@@ -1205,7 +1205,23 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     // undo that worked, but cost five line renders per keystroke instead of three
     // and typing felt it.
     if (!clear_background)
-        display->drawFilledRectangle(0, caretY - font_height, screen_width, caretY + wp_descent, 0);
+    {
+        // The band must not eat the status bar. With a deep-descender face (Large)
+        // caretY + wp_descent reaches past the divider, and since the status bar
+        // is only repainted when something it shows changed, erasing it here left
+        // it blank for the whole burst of typing - it came back only when the
+        // writer stopped and the save flipped `saved`. Stop short of it, and when
+        // the caret line's own ink reaches that far, repaint the bar so nothing
+        // of the text is left lying under it.
+        int bandBottom = caretY + wp_descent;
+        int statusTop = STATUSBAR_Y - 16;
+        if (!statusbar_hidden && bandBottom >= statusTop)
+        {
+            bandBottom = statusTop - 1;
+            wp_status_dirty = true;
+        }
+        display->drawFilledRectangle(0, caretY - font_height, screen_width, bandBottom, 0);
+    }
 
     u8->setCursor(marginX, caretY);
     WP_render_line(display, u8, cursorLine);
@@ -1629,20 +1645,19 @@ void WP_render_cursor(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
     // below it.
     int barY = caretBaselineY + (caretBaselineY == editY ? (cursorY - editY) : 3);
 
-    // Delete previous cursor line
-    if (cursorLinePos != cursorLinePos_prev)
-    {
-        //
-        display->drawFilledRectangle(
-            0,
-            barY,
-            screen_width,
-            barY + cursorHeight,
-            0);
-
-        //
-        cursorLinePos_prev = cursorLinePos;
-    }
+    // Erase the PREVIOUS caret bar - just where it was, not the whole line. This
+    // used to wipe a full-width 2px strip at barY whenever the caret column
+    // changed, which is every keystroke, and it ran after the text was drawn:
+    // barY sits in the descender zone, so the strip sliced the bottoms off every
+    // و / ي / ن on the caret line until the next full repaint put them back.
+    static int barX_prev = -1;
+    static int barY_prev = -1;
+    if (barX_prev >= 0 && (barX_prev != cursorX || barY_prev != barY))
+        display->drawFilledRectangle(barX_prev, barY_prev,
+                                     barX_prev + font_width, barY_prev + cursorHeight, 0);
+    barX_prev = cursorX;
+    barY_prev = barY;
+    cursorLinePos_prev = cursorLinePos;
 
     // Cursor Blink sits under the active line (bottom edge in bottom mode)
     if (blink)
