@@ -271,12 +271,33 @@ static void applyLineSpacing(int spacing)
 // can leave a lot of slack, doesn't push the block conspicuously high.
 static const int HIDDEN_BOTTOM_LIFT_MAX = 8;
 
+// Deepest ink below a baseline for the active face, measured in WP_applyFont
+// (which calls applyStatusbarLayout right after, so the layout below sees it).
+static int wp_descent = 6;
+
 static void applyStatusbarLayout()
 {
     int spacing = status()["config"]["line_spacing"] | 0;
 
     cursorY = statusbar_hidden ? 298 : 270;
     editY = cursorY - 6;
+
+    // Reserve room for the deepest ink the face can put below a baseline. With
+    // the status bar shown and a deep-descender face (Large: wp_descent 18) the
+    // bottom line's tails reached past the divider, which meant either erasing
+    // the bar (it vanished for the whole burst of typing) or repainting it on
+    // every keystroke - and on this panel a repaint of that band is a visible
+    // flicker. Neither is acceptable, so the text block gives up the space
+    // instead; at Large that can cost a line, which is the honest trade.
+    if (!statusbar_hidden)
+    {
+        int maxBaseline = (STATUSBAR_Y - 16) - 1 - wp_descent;
+        if (editY > maxBaseline)
+        {
+            editY = maxBaseline;
+            cursorY = editY + 6; // keep the caret bar hugging its own line
+        }
+    }
     applyLineSpacing(spacing);
 
     if (statusbar_hidden)
@@ -306,7 +327,7 @@ static int8_t wp_arabicW[256];
 // it used to be a hardcoded 6, which was right for profont22 + 10x20 and far too
 // tight once a face is pixel-doubled - the uncleared tails of the previous frame
 // stay on screen as marks under the last line.
-static int wp_descent = 6;
+
 
 // Shaped-run advance cache for WP_measure_char_at (one word at a time).
 static const char *cw_buf = nullptr;
@@ -1216,10 +1237,7 @@ void WP_render_text(ST7305_4p2_BW_DisplayDriver *display, U8G2_FOR_ST73XX *u8)
         int bandBottom = caretY + wp_descent;
         int statusTop = STATUSBAR_Y - 16;
         if (!statusbar_hidden && bandBottom >= statusTop)
-        {
-            bandBottom = statusTop - 1;
-            wp_status_dirty = true;
-        }
+            bandBottom = statusTop - 1; // guard: the layout above should prevent this
         display->drawFilledRectangle(0, caretY - font_height, screen_width, bandBottom, 0);
     }
 
