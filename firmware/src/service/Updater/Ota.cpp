@@ -41,6 +41,20 @@ static void setStage(const String &msg, int progress)
 // Progress from the shared connect path goes to the update screen's status line.
 static void otaNetProgress(const String &msg) { setStage(msg, -1); }
 
+#ifndef HOST_EMU
+// The radio transmitting at full power while a flash block is erased can pull
+// 3.3V low enough to reset the board, and the OTA download is exactly that:
+// Update.writeStream flashes each chunk as it arrives. 8.5dBm costs range (about
+// one room) and nothing else here. Scoped so every error return restores it,
+// or sync would keep running on a weak radio afterwards.
+struct OtaTxPower
+{
+    wifi_power_t saved;
+    OtaTxPower() : saved(WiFi.getTxPower()) { WiFi.setTxPower(WIFI_POWER_8_5dBm); }
+    ~OtaTxPower() { WiFi.setTxPower(saved); }
+};
+#endif
+
 String ota_update_url()
 {
     JsonDocument &app = status();
@@ -140,6 +154,8 @@ void ota_apply()
     }
     setState(OTA_DONE, "Updated (simulated) - press ENT to restart");
 #else
+    OtaTxPower txPower;
+
     // Free the persistent sync TLS connection first so mbedTLS has enough heap
     // for this download's own secure client (two live TLS contexts starve it).
     sync_http_close();
